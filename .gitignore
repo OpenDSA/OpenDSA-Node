@@ -216,3 +216,52 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node stuff
+
+# Dependencies
+node_modules/
+apps/*/node_modules/
+.pnp
+.pnp.js
+
+# Production / Compiled outputs
+dist/
+apps/*/dist/
+build/
+apps/*/build/
+
+# Local Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs & Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Editor & OS Artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+
+*.sln
+*.sw?
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Cache directories
+.eslintcache
+.stylelintcache
+.turbo/

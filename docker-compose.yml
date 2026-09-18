@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3000:3000"
+    command: npm run dev:backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/backend/node_modules
+      - /app/apps/web/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=mysql://root:secret@mysql:3306/lti_db
+    depends_on:
+      - mysql
+
+  web:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "5173:5173"
+    command: npm run dev:web
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/backend/node_modules
+      - /app/apps/web/node_modules
+    environment:
+      - NODE_ENV=development
+
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: lti_db
+    volumes:
+      # Persists database data across container restarts
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

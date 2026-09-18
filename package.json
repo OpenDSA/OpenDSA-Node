@@ -1,0 +1,11 @@
+{
+  "name": "opendsa",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w apps/backend",
+    "dev:web": "npm run dev -w apps/web",
+    "dev": "npm run build --workspaces"
+  }
+}
