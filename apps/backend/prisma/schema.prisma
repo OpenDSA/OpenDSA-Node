@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Models go here once the schema design is finalized.
+// See the domain breakdown from the legacy OpenDSA-LTI schema.rb:
+//   - User & Authentication (users, roles, permissions)
+//   - LMS & LTI Integration (lms_instances, lti_launches, etc.)
+//   - Course & Book compilation config (courses, books, chapters/modules)
+//   - Exercise tracking & grade reporting (exercises, attempts, progress)
