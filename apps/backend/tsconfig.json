@@ -12,6 +12,7 @@
     "module": "nodenext",
     "moduleResolution": "node16",
     "types": ["node"],
+    "rootDir": "./src",
     "outDir": "./dist"
   },
   "include": ["src"]

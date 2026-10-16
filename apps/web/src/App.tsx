@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import CreateCourse from "./pages/CreateCourse";
 
 function App() {
   const [status, setStatus] = useState("checking...");
@@ -14,6 +15,8 @@ function App() {
     <div>
       <h1>OpenDSA</h1>
       <p>Backend status: {status}</p>
+
+      <CreateCourse />
     </div>
   );
 }
