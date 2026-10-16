@@ -18,3 +18,46 @@ A MySQL server image is started up by docker compose for development profiles, b
 Plan to use LTIjs for lti 1.3 authentication management
 Plan to use Passport.js for web app login authentication
 Plan to use Prisma as an ORM
+
+
+### Local Database Setup
+
+1. Start MySQL from the repository root:
+
+   ```bash
+   docker compose up -d mysql
+   ```
+
+2. Navigate to the backend and install dependencies:
+
+   ```bash
+   cd apps/backend
+   npm install
+   ```
+
+3. Create `apps/backend/.env` with:
+
+   ```env
+   DATABASE_URL="mysql://root:secret@localhost:3306/lti_db"
+   ```
+
+4. Apply the database migrations and generate the Prisma client:
+
+   ```bash
+   npx prisma migrate dev
+   npx prisma generate
+   ```
+
+5. Populate the database with sample data:
+
+   ```bash
+   npx tsx prisma/seed.ts
+   ```
+
+6. Optionally, inspect the database:
+
+   ```bash
+   npx prisma studio
+   ```
+
+The seed script adds sample users, exercises, exercise instances, attempts, and progress records for local development.
