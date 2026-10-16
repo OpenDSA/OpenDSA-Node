@@ -7,9 +7,5 @@
     "dev:backend": "npm run dev -w apps/backend",
     "dev:web": "npm run dev -w apps/web",
     "dev": "npm run build --workspaces"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.19.3",
-    "prisma": "^6.19.3"
   }
 }
