@@ -1,0 +1,940 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Direct translation of the legacy Rails schema.rb.
+// No proposed redesign changes have been applied.
+
+model ActiveAdminComments {
+  id            Int       @id @default(autoincrement())
+  namespace     String?   @db.VarChar(255)
+  body          String?   @db.Text
+  resource_id   String    @db.VarChar(255)
+  resource_type String    @db.VarChar(255)
+  author_id     Int?
+  author_type   String?   @db.VarChar(255)
+  created_at    DateTime?
+  updated_at    DateTime?
+
+  @@index([author_type, author_id], map: "index_active_admin_comments_on_author_type_and_author_id")
+  @@index([namespace], map: "index_active_admin_comments_on_namespace")
+  @@index([resource_type, resource_id], map: "index_active_admin_comments_on_resource_type_and_resource_id")
+  @@map("active_admin_comments")
+}
+
+model CourseEnrollments {
+  id                 Int @id @default(autoincrement())
+  user_id            Int
+  course_offering_id Int
+  course_role_id     Int
+
+  course_offering CourseOfferings @relation("CourseEnrollments_CourseOfferingId", fields: [course_offering_id], references: [id], onDelete: Cascade)
+  course_role     CourseRoles     @relation("CourseEnrollments_CourseRoleId", fields: [course_role_id], references: [id])
+  user            Users           @relation("CourseEnrollments_UserId", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, course_offering_id], map: "index_course_enrollments_on_user_id_and_course_offering_id")
+  @@index([course_offering_id], map: "index_course_enrollments_on_course_offering_id")
+  @@index([course_role_id], map: "index_course_enrollments_on_course_role_id")
+  @@index([user_id], map: "index_course_enrollments_on_user_id")
+  @@map("course_enrollments")
+}
+
+model CourseOfferings {
+  id                      Int       @id @default(autoincrement())
+  course_id               Int
+  term_id                 Int
+  label                   String    @db.VarChar(255)
+  url                     String?   @db.VarChar(255)
+  self_enrollment_allowed Boolean?  @default(true)
+  created_at              DateTime?
+  updated_at              DateTime?
+  cutoff_date             DateTime? @db.Date
+  late_policy_id          Int?
+  lms_instance_id         Int
+  lms_course_code         String?   @db.VarChar(255)
+  lms_course_num          String    @db.VarChar(255)
+  archived                Boolean?  @default(false)
+
+  course       Courses       @relation("CourseOfferings_CourseId", fields: [course_id], references: [id], onDelete: Cascade)
+  late_policy  LatePolicies? @relation("CourseOfferings_LatePolicyId", fields: [late_policy_id], references: [id])
+  lms_instance LmsInstances  @relation("CourseOfferings_LmsInstanceId", fields: [lms_instance_id], references: [id])
+  term         Terms         @relation("CourseOfferings_TermId", fields: [term_id], references: [id], onDelete: Cascade)
+
+  course_enrollments             CourseEnrollments[]           @relation("CourseEnrollments_CourseOfferingId")
+  inst_books                     InstBooks[]                   @relation("InstBooks_CourseOfferingId")
+  inst_course_offering_exercises InstCourseOfferingExercises[] @relation("InstCourseOfferingExercises_CourseOfferingId")
+  inst_module_versions           InstModuleVersions[]          @relation("InstModuleVersions_CourseOfferingId")
+  lti_launches                   LtiLaunches[]                 @relation("LtiLaunches_CourseOfferingId")
+
+  @@index([course_id], map: "index_course_offerings_on_course_id")
+  @@index([late_policy_id], map: "course_offerings_late_policy_id_fk")
+  @@index([lms_instance_id, lms_course_num], map: "index_course_offerings_on_lms_instance_id_and_lms_course_num")
+  @@index([term_id], map: "index_course_offerings_on_term_id")
+  @@map("course_offerings")
+}
+
+model CourseRoles {
+  id                         Int     @id @default(autoincrement())
+  name                       String  @db.VarChar(255)
+  can_manage_course          Boolean @default(false)
+  can_manage_assignments     Boolean @default(false)
+  can_grade_submissions      Boolean @default(false)
+  can_view_other_submissions Boolean @default(false)
+  builtin                    Boolean @default(false)
+
+  course_enrollments CourseEnrollments[] @relation("CourseEnrollments_CourseRoleId")
+
+  @@map("course_roles")
+}
+
+model Courses {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  number          String    @db.VarChar(255)
+  organization_id Int
+  user_id         Int
+  created_at      DateTime?
+  updated_at      DateTime?
+  slug            String    @db.VarChar(255)
+
+  organization     Organizations     @relation("Courses_OrganizationId", fields: [organization_id], references: [id], onDelete: Cascade)
+  course_offerings CourseOfferings[] @relation("CourseOfferings_CourseId")
+
+  @@index([organization_id], map: "index_courses_on_organization_id")
+  @@index([slug], map: "index_courses_on_slug")
+  @@index([user_id], map: "index_courses_on_user_id")
+  @@map("courses")
+}
+
+model DelayedJobs {
+  id               Int       @id @default(autoincrement())
+  priority         Int       @default(0)
+  attempts         Int       @default(0)
+  handler          String    @db.Text
+  last_error       String?   @db.Text
+  run_at           DateTime?
+  locked_at        DateTime?
+  failed_at        DateTime?
+  locked_by        String?   @db.VarChar(255)
+  queue            String?   @db.VarChar(255)
+  created_at       DateTime?
+  updated_at       DateTime?
+  progress_stage   String?   @db.VarChar(255)
+  progress_current Int?      @default(0)
+  progress_max     Int?      @default(0)
+
+  @@index([priority, run_at], map: "delayed_jobs_priority")
+  @@map("delayed_jobs")
+}
+
+model Errors {
+  id          Int       @id @default(autoincrement())
+  usable_type String?   @db.VarChar(255)
+  usable_id   Int?
+  class_name  String?   @db.VarChar(255)
+  message     String?   @db.Text
+  trace       String?   @db.Text
+  target_url  String?   @db.Text
+  referer_url String?   @db.Text
+  params      String?   @db.Text
+  user_agent  String?   @db.Text
+  created_at  DateTime?
+  updated_at  DateTime?
+
+  @@index([class_name], map: "index_errors_on_class_name")
+  @@index([created_at], map: "index_errors_on_created_at")
+  @@map("errors")
+}
+
+model ExerciseInstances {
+  id               Int       @id @default(autoincrement())
+  inst_exercise_id Int
+  context_type     String    @db.VarChar(50)
+  created_at       DateTime?
+  updated_at       DateTime?
+  state            Json?
+
+  inst_exercise InstExercises @relation("ExerciseInstances_InstExerciseId", fields: [inst_exercise_id], references: [id])
+
+  inst_book_section_exercise    InstBookSectionExercises?    @relation("InstBookSectionExercises_ExerciseInstanceId")
+  inst_course_offering_exercise InstCourseOfferingExercises? @relation("InstCourseOfferingExercises_ExerciseInstanceId")
+  inst_module_section_exercise  InstModuleSectionExercises?  @relation("InstModuleSectionExercises_ExerciseInstanceId")
+  odsa_exercise_attempts        OdsaExerciseAttempts[]       @relation("OdsaExerciseAttempts_ExerciseInstanceId")
+  odsa_exercise_progresses      OdsaExerciseProgresses[]     @relation("OdsaExerciseProgresses_ExerciseInstanceId")
+  odsa_user_interactions        OdsaUserInteractions[]       @relation("OdsaUserInteractions_ExerciseInstanceId")
+  odsa_user_time_trackings      OdsaUserTimeTrackings[]      @relation("OdsaUserTimeTrackings_ExerciseInstanceId")
+
+  @@index([inst_exercise_id])
+  @@map("exercise_instances")
+}
+
+model FriendlyIdSlugs {
+  id             Int       @id @default(autoincrement())
+  slug           String    @db.VarChar(255)
+  sluggable_id   Int
+  sluggable_type String?   @db.VarChar(50)
+  scope          String?   @db.VarChar(255)
+  created_at     DateTime?
+
+  @@unique([slug, sluggable_type, scope], map: "index_friendly_id_slugs_on_slug_and_sluggable_type_and_scope")
+  @@index([slug, sluggable_type], map: "index_friendly_id_slugs_on_slug_and_sluggable_type")
+  @@index([sluggable_id], map: "index_friendly_id_slugs_on_sluggable_id")
+  @@index([sluggable_type], map: "index_friendly_id_slugs_on_sluggable_type")
+  @@map("friendly_id_slugs")
+}
+
+model GlobalRoles {
+  id                            Int     @id @default(autoincrement())
+  name                          String  @db.VarChar(255)
+  can_manage_all_courses        Boolean @default(false)
+  can_edit_system_configuration Boolean @default(false)
+  builtin                       Boolean @default(false)
+
+  users Users[] @relation("Users_GlobalRoleId")
+
+  @@map("global_roles")
+}
+
+model Identities {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  provider   String    @db.VarChar(255)
+  uid        String    @db.VarChar(255)
+  created_at DateTime?
+  updated_at DateTime?
+
+  user Users @relation("Identities_UserId", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([uid, provider], map: "index_identities_on_uid_and_provider")
+  @@index([user_id], map: "index_identities_on_user_id")
+  @@map("identities")
+}
+
+model InstBookSectionExercises {
+  id                   Int       @id @default(autoincrement())
+  inst_book_id         Int
+  inst_section_id      Int
+  inst_exercise_id     Int?
+  exercise_instance_id Int?      @unique
+  points               Decimal   @db.Decimal(5, 2)
+  required             Boolean?  @default(false)
+  threshold            Decimal   @db.Decimal(5, 2)
+  created_at           DateTime?
+  updated_at           DateTime?
+  type                 Boolean?
+  options              String?   @db.LongText
+  partial_credit       Boolean?  @default(false)
+  json                 String?   @db.Text
+
+  inst_book         InstBooks          @relation("InstBookSectionExercises_InstBookId", fields: [inst_book_id], references: [id])
+  inst_exercise     InstExercises?     @relation("InstBookSectionExercises_InstExerciseId", fields: [inst_exercise_id], references: [id])
+  inst_section      InstSections       @relation("InstBookSectionExercises_InstSectionId", fields: [inst_section_id], references: [id])
+  exercise_instance ExerciseInstances? @relation("InstBookSectionExercises_ExerciseInstanceId", fields: [exercise_instance_id], references: [id]) // NEW
+
+  @@index([inst_book_id], map: "inst_book_section_exercises_inst_book_id_fk")
+  @@index([inst_exercise_id], map: "inst_book_section_exercises_inst_exercise_id_fk")
+  @@index([inst_section_id], map: "inst_book_section_exercises_inst_section_id_fk")
+  @@map("inst_book_section_exercises")
+}
+
+model InstBooks {
+  id                 Int       @id @default(autoincrement())
+  course_offering_id Int?
+  user_id            Int
+  title              String    @db.VarChar(50)
+  created_at         DateTime?
+  updated_at         DateTime?
+  template           Boolean?  @default(false)
+  desc               String?   @db.VarChar(255)
+  last_compiled      DateTime?
+  options            String?   @db.LongText
+  book_type          Int?
+
+  course_offering CourseOfferings? @relation("InstBooks_CourseOfferingId", fields: [course_offering_id], references: [id])
+  user            Users            @relation("InstBooks_UserId", fields: [user_id], references: [id])
+
+  inst_book_section_exercises InstBookSectionExercises[] @relation("InstBookSectionExercises_InstBookId")
+  inst_chapters               InstChapters[]             @relation("InstChapters_InstBookId")
+  odsa_book_progresses        OdsaBookProgresses[]       @relation("OdsaBookProgresses_InstBookId")
+  odsa_exercise_attempts      OdsaExerciseAttempts[]     @relation("OdsaExerciseAttempts_InstBookId")
+  odsa_module_progresses      OdsaModuleProgresses[]     @relation("OdsaModuleProgresses_InstBookId")
+  odsa_user_interactions      OdsaUserInteractions[]     @relation("OdsaUserInteractions_InstBookId")
+  odsa_user_time_trackings    OdsaUserTimeTrackings[]    @relation("OdsaUserTimeTrackings_InstBookId")
+
+  @@index([course_offering_id], map: "inst_books_course_offering_id_fk")
+  @@index([user_id], map: "inst_books_user_id_fk")
+  @@map("inst_books")
+}
+
+model InstChapterModules {
+  id                  Int       @id @default(autoincrement())
+  inst_chapter_id     Int
+  inst_module_id      Int
+  module_position     Int?
+  lms_module_item_id  Int?
+  lms_section_item_id Int?
+  created_at          DateTime?
+  updated_at          DateTime?
+  lms_assignment_id   Int?
+  due_dates           DateTime?
+
+  inst_chapter InstChapters @relation("InstChapterModules_InstChapterId", fields: [inst_chapter_id], references: [id])
+  inst_module  InstModules  @relation("InstChapterModules_InstModuleId", fields: [inst_module_id], references: [id])
+
+  inst_sections          InstSections[]         @relation("InstSections_InstChapterModuleId")
+  odsa_module_progresses OdsaModuleProgresses[] @relation("OdsaModuleProgresses_InstChapterModuleId")
+
+  @@index([inst_chapter_id], map: "inst_chapter_modules_inst_chapter_id_fk")
+  @@index([inst_module_id], map: "inst_chapter_modules_inst_module_id_fk")
+  @@map("inst_chapter_modules")
+}
+
+model InstChapters {
+  id                      Int       @id @default(autoincrement())
+  inst_book_id            Int
+  name                    String    @db.VarChar(100)
+  short_display_name      String?   @db.VarChar(45)
+  position                Int?
+  lms_chapter_id          Int?
+  lms_assignment_group_id Int?
+  created_at              DateTime?
+  updated_at              DateTime?
+
+  inst_book InstBooks @relation("InstChapters_InstBookId", fields: [inst_book_id], references: [id])
+
+  inst_chapter_modules     InstChapterModules[]    @relation("InstChapterModules_InstChapterId")
+  odsa_user_time_trackings OdsaUserTimeTrackings[] @relation("OdsaUserTimeTrackings_InstChapterId")
+
+  @@index([inst_book_id], map: "inst_chapters_inst_book_id_fk")
+  @@map("inst_chapters")
+}
+
+model InstCourseOfferingExercises {
+  id                   Int       @id @default(autoincrement())
+  course_offering_id   Int
+  inst_exercise_id     Int
+  exercise_instance_id Int?      @unique
+  resource_link_id     String?   @db.VarChar(255)
+  resource_link_title  String?   @db.VarChar(255)
+  created_at           DateTime?
+  updated_at           DateTime?
+  threshold            Decimal   @db.Decimal(5, 2)
+  points               Decimal   @db.Decimal(5, 2)
+  options              String?   @db.LongText
+
+  course_offering   CourseOfferings    @relation("InstCourseOfferingExercises_CourseOfferingId", fields: [course_offering_id], references: [id])
+  inst_exercise     InstExercises      @relation("InstCourseOfferingExercises_InstExerciseId", fields: [inst_exercise_id], references: [id])
+  exercise_instance ExerciseInstances? @relation("InstCourseOfferingExercises_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@unique([course_offering_id, resource_link_id, inst_exercise_id], map: "index_inst_course_offering_exercises_on_course_offering_res")
+  @@index([inst_exercise_id], map: "inst_course_offering_exercises_inst_exercise_id_fk")
+  @@map("inst_course_offering_exercises")
+}
+
+model InstExercises {
+  id            Int       @id @default(autoincrement())
+  name          String?   @db.VarChar(255)
+  short_name    String    @db.VarChar(255)
+  ex_type       String?   @db.VarChar(50)
+  description   String?   @db.VarChar(255)
+  created_at    DateTime?
+  updated_at    DateTime?
+  learning_tool String?   @db.VarChar(255)
+  av_address    String?   @db.VarChar(512)
+  width         Int?
+  height        Int?
+  links         String?   @db.Text
+  scripts       String?   @db.Text
+
+  inst_book_section_exercises    InstBookSectionExercises[]    @relation("InstBookSectionExercises_InstExerciseId")
+  inst_course_offering_exercises InstCourseOfferingExercises[] @relation("InstCourseOfferingExercises_InstExerciseId")
+  inst_module_section_exercises  InstModuleSectionExercises[]  @relation("InstModuleSectionExercises_InstExerciseId")
+  exercise_instances             ExerciseInstances[]           @relation("ExerciseInstances_InstExerciseId")
+
+  @@unique([short_name], map: "index_inst_exercises_on_short_name")
+  @@map("inst_exercises")
+}
+
+model InstModuleSectionExercises {
+  id                     Int      @id @default(autoincrement())
+  inst_module_version_id Int
+  inst_module_section_id Int
+  inst_exercise_id       Int
+  exercise_instance_id   Int?     @unique
+  points                 Decimal  @db.Decimal(5, 2)
+  required               Boolean? @default(false)
+  threshold              Decimal  @db.Decimal(5, 2)
+  options                String?  @db.Text
+  created_at             DateTime
+  updated_at             DateTime
+  partial_credit         Boolean? @default(false)
+
+  inst_exercise       InstExercises      @relation("InstModuleSectionExercises_InstExerciseId", fields: [inst_exercise_id], references: [id])
+  inst_module_section InstModuleSections @relation("InstModuleSectionExercises_InstModuleSectionId", fields: [inst_module_section_id], references: [id])
+  inst_module_version InstModuleVersions @relation("InstModuleSectionExercises_InstModuleVersionId", fields: [inst_module_version_id], references: [id])
+  exercise_instance   ExerciseInstances? @relation("InstModuleSectionExercises_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@index([inst_exercise_id], map: "fk_rails_9b61737c9f")
+  @@index([inst_module_section_id], map: "fk_rails_b320810099")
+  @@index([inst_module_version_id], map: "fk_rails_5c4fc2ff52")
+  @@map("inst_module_section_exercises")
+}
+
+model InstModuleSections {
+  id                     Int      @id @default(autoincrement())
+  inst_module_version_id Int
+  name                   String   @db.VarChar(255)
+  show                   Boolean? @default(true)
+  learning_tool          String?  @db.VarChar(255)
+  resource_type          String?  @db.VarChar(255)
+  resource_name          String?  @db.VarChar(255)
+  created_at             DateTime
+  updated_at             DateTime
+
+  inst_module_version InstModuleVersions @relation("InstModuleSections_InstModuleVersionId", fields: [inst_module_version_id], references: [id])
+
+  inst_module_section_exercises InstModuleSectionExercises[] @relation("InstModuleSectionExercises_InstModuleSectionId")
+
+  @@index([inst_module_version_id], map: "fk_rails_ff11275e48")
+  @@map("inst_module_sections")
+}
+
+model InstModuleVersions {
+  id                  Int      @id @default(autoincrement())
+  inst_module_id      Int
+  name                String   @db.VarChar(255)
+  git_hash            String   @db.VarChar(255)
+  file_path           String   @db.VarChar(4096)
+  template            Boolean? @default(false)
+  course_offering_id  Int?
+  resource_link_id    String?  @db.VarChar(255)
+  resource_link_title String?  @db.VarChar(512)
+  created_at          DateTime
+  updated_at          DateTime
+
+  course_offering CourseOfferings? @relation("InstModuleVersions_CourseOfferingId", fields: [course_offering_id], references: [id])
+  inst_module     InstModules      @relation("InstModuleVersions_InstModuleId", fields: [inst_module_id], references: [id])
+
+  inst_module_section_exercises InstModuleSectionExercises[] @relation("InstModuleSectionExercises_InstModuleVersionId")
+  inst_module_sections          InstModuleSections[]         @relation("InstModuleSections_InstModuleVersionId")
+  inst_modules                  InstModules[]                @relation("InstModules_CurrentVersionId")
+  odsa_module_progresses        OdsaModuleProgresses[]       @relation("OdsaModuleProgresses_InstModuleVersionId")
+  odsa_user_interactions        OdsaUserInteractions[]       @relation("OdsaUserInteractions_InstModuleVersionId")
+  odsa_user_time_trackings      OdsaUserTimeTrackings[]      @relation("OdsaUserTimeTrackings_InstModuleVersionId")
+
+  @@unique([course_offering_id, resource_link_id], map: "index_inst_module_versions_on_course_resource")
+  @@index([inst_module_id], map: "fk_rails_7e343b3134")
+  @@map("inst_module_versions")
+}
+
+model InstModules {
+  id                 Int       @id @default(autoincrement())
+  path               String    @db.VarChar(255)
+  name               String    @db.VarChar(255)
+  created_at         DateTime?
+  updated_at         DateTime?
+  current_version_id Int?
+
+  current_version InstModuleVersions? @relation("InstModules_CurrentVersionId", fields: [current_version_id], references: [id])
+
+  inst_chapter_modules     InstChapterModules[]    @relation("InstChapterModules_InstModuleId")
+  inst_module_versions     InstModuleVersions[]    @relation("InstModuleVersions_InstModuleId")
+  inst_sections            InstSections[]          @relation("InstSections_InstModuleId")
+  odsa_user_time_trackings OdsaUserTimeTrackings[] @relation("OdsaUserTimeTrackings_InstModuleId")
+
+  @@unique([path], map: "index_inst_modules_on_path")
+  @@index([current_version_id], map: "fk_rails_73d3622e40")
+  @@map("inst_modules")
+}
+
+model InstSections {
+  id                     Int       @id @default(autoincrement())
+  inst_module_id         Int
+  inst_chapter_module_id Int
+  short_display_name     String?   @db.VarChar(50)
+  name                   String    @db.VarChar(255)
+  position               Int?
+  gradable               Boolean?  @default(false)
+  soft_deadline          DateTime?
+  hard_deadline          DateTime?
+  time_limit             Int?
+  show                   Boolean?  @default(true)
+  lms_item_id            Int?
+  lms_assignment_id      Int?
+  created_at             DateTime?
+  updated_at             DateTime?
+  learning_tool          String?   @db.VarChar(255)
+  resource_type          String?   @db.VarChar(255)
+  resource_name          String?   @db.VarChar(255)
+  lms_posted             Boolean?
+  time_posted            DateTime?
+
+  inst_chapter_module InstChapterModules @relation("InstSections_InstChapterModuleId", fields: [inst_chapter_module_id], references: [id])
+  inst_module         InstModules        @relation("InstSections_InstModuleId", fields: [inst_module_id], references: [id])
+
+  inst_book_section_exercises InstBookSectionExercises[] @relation("InstBookSectionExercises_InstSectionId")
+  odsa_exercise_attempts      OdsaExerciseAttempts[]     @relation("OdsaExerciseAttempts_InstSectionId")
+  odsa_student_extensions     OdsaStudentExtensions[]    @relation("OdsaStudentExtensions_InstSectionId")
+  odsa_user_interactions      OdsaUserInteractions[]     @relation("OdsaUserInteractions_InstSectionId")
+  odsa_user_time_trackings    OdsaUserTimeTrackings[]    @relation("OdsaUserTimeTrackings_InstSectionId")
+
+  @@index([inst_chapter_module_id], map: "inst_sections_inst_chapter_module_id_fk")
+  @@index([inst_module_id], map: "inst_sections_inst_module_id_fk")
+  @@map("inst_sections")
+}
+
+model Languages {
+  id         Int       @id @default(autoincrement())
+  name       String?   @db.VarChar(255)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@map("languages")
+}
+
+model LatePolicies {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  late_days    Int
+  late_percent Int
+  created_at   DateTime?
+  updated_at   DateTime?
+
+  course_offerings CourseOfferings[] @relation("CourseOfferings_LatePolicyId")
+
+  @@unique([name], map: "index_late_policies_on_name")
+  @@map("late_policies")
+}
+
+model LearningTools {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  key        String    @db.VarChar(255)
+  secret     String    @db.VarChar(255)
+  launch_url String    @db.VarChar(255)
+  created_at DateTime?
+  updated_at DateTime?
+
+  @@unique([name], map: "index_learning_tools_on_name")
+  @@map("learning_tools")
+}
+
+model LmsAccesses {
+  id              Int       @id @default(autoincrement())
+  access_token    String?   @db.VarChar(255)
+  created_at      DateTime?
+  updated_at      DateTime?
+  lms_instance_id Int
+  user_id         Int
+  consumer_key    String?   @db.VarChar(255)
+  consumer_secret String?   @db.VarChar(255)
+
+  lms_instance LmsInstances @relation("LmsAccesses_LmsInstanceId", fields: [lms_instance_id], references: [id])
+  user         Users        @relation("LmsAccesses_UserId", fields: [user_id], references: [id])
+
+  odsa_exercise_progresses OdsaExerciseProgresses[] @relation("OdsaExerciseProgresses_LmsAccessId")
+  odsa_module_progresses   OdsaModuleProgresses[]   @relation("OdsaModuleProgresses_LmsAccessId")
+
+  @@unique([lms_instance_id, user_id], map: "index_lms_accesses_on_lms_instance_id_and_user_id")
+  @@index([user_id], map: "lms_accesses_user_id_fk")
+  @@map("lms_accesses")
+}
+
+model LmsInstances {
+  id                     Int       @id @default(autoincrement())
+  url                    String    @db.VarChar(255)
+  created_at             DateTime?
+  updated_at             DateTime?
+  lms_type_id            Int?
+  consumer_key           String?   @db.VarChar(255)
+  consumer_secret        String?   @db.VarChar(255)
+  organization_id        Int?
+  client_id              String?   @db.VarChar(255)
+  private_key            String?   @db.Text
+  public_key             String?   @db.Text
+  keyset_url             String?   @db.VarChar(255)
+  oauth2_url             String?   @db.VarChar(255)
+  platform_oidc_auth_url String?   @db.VarChar(255)
+  issuer                 String?   @db.VarChar(255)
+
+  lms_type     LmsTypes?      @relation("LmsInstances_LmsTypeId", fields: [lms_type_id], references: [id])
+  organization Organizations? @relation("LmsInstances_OrganizationId", fields: [organization_id], references: [id])
+
+  course_offerings CourseOfferings[] @relation("CourseOfferings_LmsInstanceId")
+  lms_accesses     LmsAccesses[]     @relation("LmsAccesses_LmsInstanceId")
+  lti_launches     LtiLaunches[]     @relation("LtiLaunches_LmsInstanceId")
+
+  @@unique([url], map: "index_lms_instances_on_url")
+  @@index([lms_type_id], map: "lms_instances_lms_type_id_fk")
+  @@index([organization_id], map: "lms_instances_organization_id_fk")
+  @@map("lms_instances")
+}
+
+model LmsTypes {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  created_at DateTime?
+  updated_at DateTime?
+
+  lms_instances LmsInstances[] @relation("LmsInstances_LmsTypeId")
+
+  @@unique([name], map: "index_lms_types_on_name")
+  @@map("lms_types")
+}
+
+model LtiLaunches {
+  id                 BigInt   @id @default(autoincrement())
+  lms_instance_id    Int
+  user_id            Int
+  course_offering_id Int
+  id_token           String?  @db.Text
+  decoded_jwt        String?  @db.LongText
+  kid                String?  @db.VarChar(255)
+  expires_at         DateTime
+  created_at         DateTime
+  updated_at         DateTime
+
+  course_offering CourseOfferings @relation("LtiLaunches_CourseOfferingId", fields: [course_offering_id], references: [id])
+  lms_instance    LmsInstances    @relation("LtiLaunches_LmsInstanceId", fields: [lms_instance_id], references: [id])
+  user            Users           @relation("LtiLaunches_UserId", fields: [user_id], references: [id])
+
+  @@index([course_offering_id], map: "index_lti_launches_on_course_offering_id")
+  @@index([expires_at], map: "index_lti_launches_on_expires_at")
+  @@index([lms_instance_id], map: "fk_rails_73ea582aae")
+  @@index([user_id], map: "fk_rails_bb7142408e")
+  @@map("lti_launches")
+}
+
+model OdsaBookProgresses {
+  id                   Int       @id @default(autoincrement())
+  user_id              Int
+  inst_book_id         Int
+  started_exercises    String    @db.LongText
+  proficient_exercises String    @db.LongText
+  created_at           DateTime?
+  updated_at           DateTime?
+
+  inst_book InstBooks @relation("OdsaBookProgresses_InstBookId", fields: [inst_book_id], references: [id])
+  user      Users     @relation("OdsaBookProgresses_UserId", fields: [user_id], references: [id])
+
+  @@unique([user_id, inst_book_id], map: "index_odsa_book_progresses_on_user_id_and_inst_book_id")
+  @@index([inst_book_id], map: "odsa_book_progresses_inst_book_id_fk")
+  @@map("odsa_book_progresses")
+}
+
+model OdsaBugs {
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  os_family      String    @db.VarChar(50)
+  browser_family String    @db.VarChar(20)
+  title          String    @db.VarChar(50)
+  description    String    @db.LongText
+  screenshot     String?   @db.VarChar(100)
+  created_at     DateTime?
+  updated_at     DateTime?
+
+  @@map("odsa_bugs")
+}
+
+model OdsaExerciseAttempts {
+  id                   Int       @id @default(autoincrement())
+  user_id              Int
+  inst_book_id         Int?
+  inst_section_id      Int?
+  exercise_instance_id Int?
+  worth_credit         Boolean
+  time_done            DateTime
+  time_taken           Int
+  count_hints          Int
+  hint_used            Boolean
+  points_earned        Decimal   @db.Decimal(5, 2)
+  earned_proficiency   Boolean
+  count_attempts       BigInt
+  ip_address           String    @db.VarChar(20)
+  question_name        String    @db.VarChar(50)
+  request_type         String?   @db.VarChar(50)
+  created_at           DateTime?
+  updated_at           DateTime?
+  correct              Boolean?
+  pe_score             Decimal?  @db.Decimal(5, 2)
+  pe_steps_fixed       Int?
+  answer               String?   @db.VarChar(255)
+  question_id          Int?
+  finished_frame       Boolean?
+  state                Json?
+
+  inst_book         InstBooks?         @relation("OdsaExerciseAttempts_InstBookId", fields: [inst_book_id], references: [id])
+  inst_section      InstSections?      @relation("OdsaExerciseAttempts_InstSectionId", fields: [inst_section_id], references: [id])
+  user              Users              @relation("OdsaExerciseAttempts_UserId", fields: [user_id], references: [id])
+  exercise_instance ExerciseInstances? @relation("OdsaExerciseAttempts_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@index([inst_book_id], map: "odsa_exercise_attempts_inst_book_id_fk")
+  @@index([inst_section_id], map: "odsa_exercise_attempts_inst_section_id_fk")
+  @@index([exercise_instance_id])
+  @@index([user_id], map: "odsa_exercise_attempts_user_id_fk")
+  @@map("odsa_exercise_attempts")
+}
+
+model OdsaExerciseProgresses {
+  id                      Int       @id @default(autoincrement())
+  user_id                 Int
+  current_score           Int
+  highest_score           Int
+  first_done              DateTime
+  last_done               DateTime
+  total_correct           Int
+  total_worth_credit      Int
+  proficient_date         DateTime
+  current_exercise        String?   @db.VarChar(255)
+  correct_exercises       String?   @db.VarChar(255)
+  hinted_exercise         String?   @db.VarChar(255)
+  created_at              DateTime?
+  updated_at              DateTime?
+  lis_outcome_service_url String?   @db.VarChar(255)
+  lis_result_sourcedid    String?   @db.VarChar(255)
+  lms_access_id           Int?
+  exercise_instance_id    Int?
+
+  lms_access        LmsAccesses?       @relation("OdsaExerciseProgresses_LmsAccessId", fields: [lms_access_id], references: [id])
+  user              Users              @relation("OdsaExerciseProgresses_UserId", fields: [user_id], references: [id])
+  exercise_instance ExerciseInstances? @relation("OdsaExerciseProgresses_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@unique([user_id, exercise_instance_id])
+  @@index([lms_access_id], map: "fk_rails_3327f6b532")
+  @@map("odsa_exercise_progresses")
+}
+
+model OdsaModuleProgresses {
+  id                      Int       @id @default(autoincrement())
+  user_id                 Int
+  inst_book_id            Int?
+  first_done              DateTime
+  last_done               DateTime
+  proficient_date         DateTime
+  created_at              DateTime?
+  updated_at              DateTime?
+  inst_chapter_module_id  Int?
+  lis_outcome_service_url String?   @db.VarChar(255)
+  lis_result_sourcedid    String?   @db.VarChar(255)
+  current_score           Float
+  highest_score           Float
+  lms_access_id           Int?
+  inst_module_version_id  Int?
+  last_passback           DateTime
+
+  inst_book           InstBooks?          @relation("OdsaModuleProgresses_InstBookId", fields: [inst_book_id], references: [id])
+  inst_chapter_module InstChapterModules? @relation("OdsaModuleProgresses_InstChapterModuleId", fields: [inst_chapter_module_id], references: [id])
+  inst_module_version InstModuleVersions? @relation("OdsaModuleProgresses_InstModuleVersionId", fields: [inst_module_version_id], references: [id])
+  lms_access          LmsAccesses?        @relation("OdsaModuleProgresses_LmsAccessId", fields: [lms_access_id], references: [id])
+  user                Users               @relation("OdsaModuleProgresses_UserId", fields: [user_id], references: [id])
+
+  @@unique([user_id, inst_chapter_module_id], map: "index_odsa_module_progress_on_user_and_module")
+  @@unique([user_id, inst_module_version_id], map: "index_odsa_mod_prog_on_user_mod_version")
+  @@index([inst_book_id], map: "odsa_module_progresses_inst_book_id_fk")
+  @@index([inst_chapter_module_id], map: "odsa_module_progresses_inst_chapter_module_id_fk")
+  @@index([inst_module_version_id], map: "fk_rails_38a9ac7560")
+  @@index([lms_access_id], map: "odsa_module_progresses_lms_access_id_fk")
+  @@map("odsa_module_progresses")
+}
+
+model OdsaStudentExtensions {
+  id              Int       @id @default(autoincrement())
+  user_id         Int?
+  inst_section_id Int
+  soft_deadline   DateTime?
+  hard_deadline   DateTime?
+  created_at      DateTime?
+  updated_at      DateTime?
+  time_limit      Int?
+  opening_date    DateTime?
+
+  inst_section InstSections @relation("OdsaStudentExtensions_InstSectionId", fields: [inst_section_id], references: [id])
+  user         Users?       @relation("OdsaStudentExtensions_UserId", fields: [user_id], references: [id])
+
+  @@index([inst_section_id], map: "odsa_student_extensions_inst_section_id_fk")
+  @@index([user_id], map: "odsa_student_extensions_user_id_fk")
+  @@map("odsa_student_extensions")
+}
+
+model OdsaUserInteractions {
+  id                     Int       @id @default(autoincrement())
+  user_id                Int
+  inst_book_id           Int?
+  inst_section_id        Int?
+  exercise_instance_id   Int?
+  name                   String    @db.VarChar(50)
+  description            String    @db.LongText
+  action_time            DateTime
+  uiid                   BigInt
+  browser_family         String    @db.VarChar(20)
+  browser_version        String    @db.VarChar(20)
+  os_family              String    @db.VarChar(50)
+  os_version             String    @db.VarChar(20)
+  device                 String    @db.VarChar(50)
+  ip_address             String    @db.VarChar(20)
+  created_at             DateTime?
+  updated_at             DateTime?
+  inst_chapter_module_id Int?
+  inst_module_version_id Int?
+
+  inst_book           InstBooks?          @relation("OdsaUserInteractions_InstBookId", fields: [inst_book_id], references: [id])
+  inst_module_version InstModuleVersions? @relation("OdsaUserInteractions_InstModuleVersionId", fields: [inst_module_version_id], references: [id])
+  inst_section        InstSections?       @relation("OdsaUserInteractions_InstSectionId", fields: [inst_section_id], references: [id])
+  user                Users               @relation("OdsaUserInteractions_UserId", fields: [user_id], references: [id])
+  exercise_instance   ExerciseInstances?  @relation("OdsaUserInteractions_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@index([inst_book_id], map: "odsa_user_interactions_inst_book_id_fk")
+  @@index([inst_chapter_module_id], map: "index_odsa_user_interactions_on_inst_chapter_module")
+  @@index([inst_module_version_id], map: "fk_rails_599b647d17")
+  @@index([inst_section_id], map: "odsa_user_interactions_inst_section_id_fk")
+  @@index([user_id], map: "odsa_user_interactions_user_id_fk")
+  @@index([exercise_instance_id])
+  @@map("odsa_user_interactions")
+}
+
+model OdsaUserTimeTrackings {
+  id                     BigInt    @id @default(autoincrement())
+  user_id                Int
+  inst_book_id           Int?
+  inst_section_id        Int?
+  inst_module_id         Int?
+  inst_chapter_id        Int?
+  inst_module_version_id Int?
+  exercise_instance_id   Int?
+  uuid                   String    @db.VarChar(50)
+  session_date           String    @db.VarChar(50)
+  total_time             Decimal   @db.Decimal(10, 2)
+  sections_time          String    @db.Text
+  created_at             DateTime?
+  updated_at             DateTime?
+
+  inst_book           InstBooks?          @relation("OdsaUserTimeTrackings_InstBookId", fields: [inst_book_id], references: [id])
+  inst_chapter        InstChapters?       @relation("OdsaUserTimeTrackings_InstChapterId", fields: [inst_chapter_id], references: [id])
+  inst_module_version InstModuleVersions? @relation("OdsaUserTimeTrackings_InstModuleVersionId", fields: [inst_module_version_id], references: [id])
+  inst_module         InstModules?        @relation("OdsaUserTimeTrackings_InstModuleId", fields: [inst_module_id], references: [id])
+  inst_section        InstSections?       @relation("OdsaUserTimeTrackings_InstSectionId", fields: [inst_section_id], references: [id])
+  user                Users               @relation("OdsaUserTimeTrackings_UserId", fields: [user_id], references: [id])
+  exercise_instance   ExerciseInstances?  @relation("OdsaUserTimeTrackings_ExerciseInstanceId", fields: [exercise_instance_id], references: [id])
+
+  @@unique([user_id, uuid], map: "index_odsa_user_time_trackings_on_user_id_uuid")
+  @@index([inst_book_id, session_date], map: "index_odsa_user_time_trackings_on_inst_book_id_session_date")
+  @@index([inst_chapter_id], map: "odsa_user_time_tracking_inst_chapter_id_fk")
+  @@index([inst_module_id], map: "odsa_user_time_tracking_inst_module_id_fk")
+  @@index([inst_module_version_id], map: "odsa_user_time_tracking_inst_module_version_id_fk")
+  @@index([inst_section_id], map: "odsa_user_time_tracking_inst_section_id_fk")
+  @@index([exercise_instance_id])
+  @@map("odsa_user_time_trackings")
+}
+
+model Organizations {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  created_at   DateTime?
+  updated_at   DateTime?
+  abbreviation String?   @db.VarChar(255)
+  slug         String    @db.VarChar(255)
+
+  courses       Courses[]      @relation("Courses_OrganizationId")
+  lms_instances LmsInstances[] @relation("LmsInstances_OrganizationId")
+
+  @@unique([name], map: "index_organizations_on_name")
+  @@unique([slug], map: "index_organizations_on_slug")
+  @@map("organizations")
+}
+
+model StudentExerciseProgresses {
+  id          BigInt   @id @default(autoincrement())
+  user_id     Int
+  exercise_id Int
+  progress    String?  @db.Text
+  grade       Decimal  @db.Decimal(5, 2)
+  created_at  DateTime
+  updated_at  DateTime
+
+  @@map("student_exercise_progresses")
+}
+
+model Terms {
+  id         Int       @id @default(autoincrement())
+  season     Int
+  starts_on  DateTime  @db.Date
+  ends_on    DateTime  @db.Date
+  year       Int
+  created_at DateTime?
+  updated_at DateTime?
+  slug       String    @db.VarChar(255)
+
+  course_offerings CourseOfferings[] @relation("CourseOfferings_TermId")
+
+  @@unique([slug], map: "index_terms_on_slug")
+  @@index([starts_on], map: "index_terms_on_starts_on")
+  @@index([year, season], map: "index_terms_on_year_and_season")
+  @@map("terms")
+}
+
+model TimeZones {
+  id         Int       @id @default(autoincrement())
+  name       String?   @db.VarChar(255)
+  zone       String?   @db.VarChar(255)
+  display_as String?   @db.VarChar(255)
+  created_at DateTime?
+  updated_at DateTime?
+
+  users Users[] @relation("Users_TimeZoneId")
+
+  @@map("time_zones")
+}
+
+model Users {
+  id                     Int       @id @default(autoincrement())
+  email                  String    @default("") @db.VarChar(255)
+  encrypted_password     String    @default("") @db.VarChar(255)
+  reset_password_token   String?   @db.VarChar(255)
+  reset_password_sent_at DateTime?
+  remember_created_at    DateTime?
+  sign_in_count          Int       @default(0)
+  current_sign_in_at     DateTime?
+  last_sign_in_at        DateTime?
+  current_sign_in_ip     String?   @db.VarChar(255)
+  last_sign_in_ip        String?   @db.VarChar(255)
+  confirmation_token     String?   @db.VarChar(255)
+  confirmed_at           DateTime?
+  confirmation_sent_at   DateTime?
+  created_at             DateTime?
+  updated_at             DateTime?
+  first_name             String?   @db.VarChar(255)
+  last_name              String?   @db.VarChar(255)
+  global_role_id         Int
+  avatar                 String?   @db.VarChar(255)
+  slug                   String    @db.VarChar(255)
+  time_zone_id           Int?
+
+  global_role GlobalRoles @relation("Users_GlobalRoleId", fields: [global_role_id], references: [id])
+  time_zone   TimeZones?  @relation("Users_TimeZoneId", fields: [time_zone_id], references: [id])
+
+  course_enrollments       CourseEnrollments[]      @relation("CourseEnrollments_UserId")
+  identities               Identities[]             @relation("Identities_UserId")
+  inst_books               InstBooks[]              @relation("InstBooks_UserId")
+  lms_accesses             LmsAccesses[]            @relation("LmsAccesses_UserId")
+  lti_launches             LtiLaunches[]            @relation("LtiLaunches_UserId")
+  odsa_book_progresses     OdsaBookProgresses[]     @relation("OdsaBookProgresses_UserId")
+  odsa_exercise_attempts   OdsaExerciseAttempts[]   @relation("OdsaExerciseAttempts_UserId")
+  odsa_exercise_progresses OdsaExerciseProgresses[] @relation("OdsaExerciseProgresses_UserId")
+  odsa_module_progresses   OdsaModuleProgresses[]   @relation("OdsaModuleProgresses_UserId")
+  odsa_student_extensions  OdsaStudentExtensions[]  @relation("OdsaStudentExtensions_UserId")
+  odsa_user_interactions   OdsaUserInteractions[]   @relation("OdsaUserInteractions_UserId")
+  odsa_user_time_trackings OdsaUserTimeTrackings[]  @relation("OdsaUserTimeTrackings_UserId")
+
+  @@unique([confirmation_token], map: "index_users_on_confirmation_token")
+  @@unique([email], map: "index_users_on_email")
+  @@unique([reset_password_token], map: "index_users_on_reset_password_token")
+  @@unique([slug], map: "index_users_on_slug")
+  @@index([global_role_id], map: "index_users_on_global_role_id")
+  @@index([time_zone_id], map: "index_users_on_time_zone_id")
+  @@map("users")
+}
