@@ -13,12 +13,13 @@ that becomes worth it - out of scope for now):
 - `__NAMESPACE__`: the Namespace you create via the Discovery dashboard
   (Cluster > Projects/Namespaces), following the course convention
   `<section><semester><year>-<projectname>`, e.g. `83585f25-opendsanode`.
-- `__TAG__`: an image tag pushed by GitLab CI (`$CI_COMMIT_SHORT_SHA` or
-  `latest`).
+- `__TAG__`: the tag you used on `docker push` (see step 5 below) -
+  `latest` or a short commit SHA you choose yourself.
 
-The VT GitLab project is `jaden/opendsa-node` (project ID 36387 on
-`git.cs.vt.edu`), so `$CI_REGISTRY_IMAGE` in CI resolves to
-`container.cs.vt.edu/jaden/opendsa-node`, and the Deployments/Job already
+There's no GitLab CI/CD here - this project has no runners available, so
+images are built and pushed manually (per `DiscoveryClusteryInstructions.pdf`),
+not via `.gitlab-ci.yml`. The VT GitLab project is `jaden/opendsa-node`
+(project ID 36387 on `git.cs.vt.edu`), and the Deployments/Job already
 hardcode the resulting image paths -
 `container.cs.vt.edu/jaden/opendsa-node/{backend,web}:__TAG__` - no
 `__GITLAB_PATH__` placeholder left to fill in.
@@ -56,9 +57,20 @@ kubectl get ns __NAMESPACE__
    kubectl get pods -n __NAMESPACE__ -l app=mysql
    kubectl logs -n __NAMESPACE__ deploy/mysql   # expect "ready for connections"
    ```
-5. Push to `main` (triggers `.gitlab-ci.yml`) or manually
-   `docker login container.cs.vt.edu` + build + push, to get the first
-   backend/web images into the registry.
+5. Build and push the first backend/web images manually (from the repo
+   root, since both Dockerfiles need the monorepo workspace context):
+   ```
+   docker login container.cs.vt.edu
+   docker build --platform=linux/amd64 -f apps/backend/Dockerfile \
+     -t container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__ .
+   docker push container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__
+   docker build --platform=linux/amd64 -f apps/web/Dockerfile \
+     -t container.cs.vt.edu/jaden/opendsa-node/web:__TAG__ .
+   docker push container.cs.vt.edu/jaden/opendsa-node/web:__TAG__
+   ```
+   `--platform=linux/amd64` is required when building from an M-series
+   Mac, since Discovery nodes are amd64. Re-run this step (with a new
+   `__TAG__`, or reusing one) every time backend/web code changes.
 6. ```
    kubectl apply -f k8s/30-migrate-job.yaml
    kubectl wait --for=condition=complete job/backend-migrate -n __NAMESPACE__ --timeout=120s
