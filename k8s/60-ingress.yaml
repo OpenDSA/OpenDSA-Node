@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opendsa
+  namespace: __NAMESPACE__
+  # Uncomment the annotations block below to allow off-campus/non-VPN access
+  # (opens the Ingress to ALL traffic - see k8s/README.md for the tradeoff
+  # before enabling):
+  # annotations:
+  #   nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: __NAMESPACE__.discovery.cs.vt.edu
+      http:
+        paths:
+          # /api listed before / - Express expects the /api prefix intact,
+          # no rewrite-target annotation here.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

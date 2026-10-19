@@ -265,3 +265,7 @@ coverage/
 .eslintcache
 .stylelintcache
 .turbo/
+
+# Discovery k8s secrets (real values, never commit)
+k8s/10-secrets.yaml
+k8s/11-registry-secret.yaml

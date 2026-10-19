@@ -1,0 +1,35 @@
+# Runs `prisma migrate deploy` once against the cluster DB using the same
+# backend image as k8s/40-backend-deployment.yaml. The backend Deployment
+# itself NEVER runs migrations on startup - only this Job does - so scaling
+# backend replicas can't race on schema changes.
+#
+# Job specs are immutable: to re-run after a fix, delete and re-apply:
+#   kubectl delete job backend-migrate -n __NAMESPACE__
+#   kubectl apply -f k8s/30-migrate-job.yaml
+#
+# Fallback for ad-hoc debugging (matches the instructor's "Execute Shell"
+# pattern): kubectl exec into a running backend pod and run
+#   npx prisma migrate deploy
+# directly, from /app/apps/backend (the image's default workdir).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate
+  namespace: __NAMESPACE__
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: opendsa-registry
+      containers:
+        - name: migrate
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-db-credentials
+                  key: DATABASE_URL
