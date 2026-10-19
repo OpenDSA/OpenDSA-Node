@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
-  namespace: __NAMESPACE__
+  namespace: 91762f26-opendsanode
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): a second pod can't mount the same

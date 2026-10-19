@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: opendsa
-  namespace: __NAMESPACE__
+  namespace: 91762f26-opendsanode
   # Uncomment the annotations block below to allow off-campus/non-VPN access
   # (opens the Ingress to ALL traffic - see k8s/README.md for the tradeoff
   # before enabling):
@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: __NAMESPACE__.discovery.cs.vt.edu
+    - host: 91762f26-opendsanode.discovery.cs.vt.edu
       http:
         paths:
           # /api listed before / - Express expects the /api prefix intact,

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mysql-data
-  namespace: __NAMESPACE__
+  namespace: 91762f26-opendsanode
 spec:
   accessModes:
     - ReadWriteOnce

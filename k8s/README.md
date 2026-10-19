@@ -6,13 +6,10 @@ full course walkthrough this is based on.
 
 ## Before applying anything - fill in these placeholders
 
-Every manifest uses `__NAMESPACE__`; the Deployments/Job also use `__TAG__`.
-Find-and-replace them (or templatize with `envsubst`/`kustomize` later if
-that becomes worth it - out of scope for now):
+Every manifest already uses the real Namespace, `91762f26-opendsanode`
+(CRN 91762, Fall 2026, created via Cluster > Projects/Namespaces on the
+Discovery dashboard). The Deployments/Job still use one placeholder:
 
-- `__NAMESPACE__`: the Namespace you create via the Discovery dashboard
-  (Cluster > Projects/Namespaces), following the course convention
-  `<section><semester><year>-<projectname>`, e.g. `83585f25-opendsanode`.
 - `__TAG__`: the tag you used on `docker push` (see step 5 below) -
   `latest` or a short commit SHA you choose yourself.
 
@@ -34,7 +31,7 @@ Created through the dashboard, not YAML - matches the course's demonstrated
 workflow. Confirm it exists before applying anything here:
 
 ```
-kubectl get ns __NAMESPACE__
+kubectl get ns 91762f26-opendsanode
 ```
 
 ## Rollout sequence
@@ -50,12 +47,12 @@ kubectl get ns __NAMESPACE__
    ```
 3. ```
    kubectl apply -f k8s/20-mysql-pvc.yaml
-   kubectl get pvc mysql-data -n __NAMESPACE__   # expect Bound
+   kubectl get pvc mysql-data -n 91762f26-opendsanode   # expect Bound
    ```
 4. ```
    kubectl apply -f k8s/21-mysql-deployment.yaml -f k8s/22-mysql-service.yaml
-   kubectl get pods -n __NAMESPACE__ -l app=mysql
-   kubectl logs -n __NAMESPACE__ deploy/mysql   # expect "ready for connections"
+   kubectl get pods -n 91762f26-opendsanode -l app=mysql
+   kubectl logs -n 91762f26-opendsanode deploy/mysql   # expect "ready for connections"
    ```
 5. Build and push the first backend/web images manually (from the repo
    root, since both Dockerfiles need the monorepo workspace context):
@@ -73,19 +70,19 @@ kubectl get ns __NAMESPACE__
    `__TAG__`, or reusing one) every time backend/web code changes.
 6. ```
    kubectl apply -f k8s/30-migrate-job.yaml
-   kubectl wait --for=condition=complete job/backend-migrate -n __NAMESPACE__ --timeout=120s
-   kubectl logs -n __NAMESPACE__ job/backend-migrate
+   kubectl wait --for=condition=complete job/backend-migrate -n 91762f26-opendsanode --timeout=120s
+   kubectl logs -n 91762f26-opendsanode job/backend-migrate
    ```
    Don't proceed if this fails. Job specs are immutable - to retry:
    ```
-   kubectl delete job backend-migrate -n __NAMESPACE__
+   kubectl delete job backend-migrate -n 91762f26-opendsanode
    kubectl apply -f k8s/30-migrate-job.yaml
    ```
    Fallback for ad-hoc debugging: `kubectl exec` into a running backend pod
    and run `npx prisma migrate deploy` directly.
 7. (Optional) seed data:
    ```
-   kubectl run opendsa-seed --rm -it --restart=Never -n __NAMESPACE__ \
+   kubectl run opendsa-seed --rm -it --restart=Never -n 91762f26-opendsanode \
      --image=container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__ \
      --overrides='{"spec":{"imagePullSecrets":[{"name":"opendsa-registry"}]}}' \
      --env="DATABASE_URL=<same value as the Secret>" \
@@ -93,27 +90,27 @@ kubectl get ns __NAMESPACE__
    ```
 8. ```
    kubectl apply -f k8s/40-backend-deployment.yaml -f k8s/41-backend-service.yaml
-   kubectl port-forward -n __NAMESPACE__ svc/backend 3000:3000
+   kubectl port-forward -n 91762f26-opendsanode svc/backend 3000:3000
    curl localhost:3000/api/health
    curl localhost:3000/api/health/db
    ```
 9. ```
    kubectl apply -f k8s/50-web-deployment.yaml -f k8s/51-web-service.yaml
-   kubectl port-forward -n __NAMESPACE__ svc/web 8080:80
+   kubectl port-forward -n 91762f26-opendsanode svc/web 8080:80
    # browse localhost:8080, confirm the SPA loads
    ```
 10. ```
     kubectl apply -f k8s/60-ingress.yaml
-    kubectl get ingress -n __NAMESPACE__
-    # browse https://__NAMESPACE__.discovery.cs.vt.edu/ and /api/health
+    kubectl get ingress -n 91762f26-opendsanode
+    # browse https://91762f26-opendsanode.discovery.cs.vt.edu/ and /api/health
     # (on-campus network or VPN unless you enabled the whitelist annotation)
     ```
 11. Restart-safety checks:
     ```
-    kubectl rollout restart deployment/backend -n __NAMESPACE__
+    kubectl rollout restart deployment/backend -n 91762f26-opendsanode
     # /api/health should stay reachable throughout (replicas: 2)
 
-    kubectl rollout restart deployment/mysql -n __NAMESPACE__
+    kubectl rollout restart deployment/mysql -n 91762f26-opendsanode
     # confirm /api/health/db still succeeds afterward, data intact
     ```
 

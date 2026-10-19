@@ -4,7 +4,7 @@
 # backend replicas can't race on schema changes.
 #
 # Job specs are immutable: to re-run after a fix, delete and re-apply:
-#   kubectl delete job backend-migrate -n __NAMESPACE__
+#   kubectl delete job backend-migrate -n 91762f26-opendsanode
 #   kubectl apply -f k8s/30-migrate-job.yaml
 #
 # Fallback for ad-hoc debugging (matches the instructor's "Execute Shell"
@@ -15,7 +15,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: backend-migrate
-  namespace: __NAMESPACE__
+  namespace: 91762f26-opendsanode
 spec:
   backoffLimit: 3
   template:
