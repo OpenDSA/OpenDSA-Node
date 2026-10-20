@@ -1,0 +1,24 @@
+name: mirror-to-gitlab
+
+# Keeps git.cs.vt.edu/jaden/opendsa-node (used only for its container
+# registry - see k8s/README.md) in sync with dev, so deploys don't depend
+# on remembering a manual `git push vt-gitlab dev` every time.
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch: {}
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push dev to GitLab mirror
+        run: |
+          git push "https://github-mirror-ci:${GITLAB_MIRROR_TOKEN}@git.cs.vt.edu/jaden/opendsa-node.git" HEAD:dev
+        env:
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
