@@ -11,12 +11,21 @@ services:
       - /app/node_modules
       - /app/apps/backend/node_modules
       - /app/apps/web/node_modules
+      # Stands in for the k8s emptyDir in 40-backend-deployment.yaml: the
+      # book-compile config handoff is written under config/temp in here.
+      - ./.opendsa-shared:/mnt/opendsa-shared
     environment:
       - NODE_ENV=development
       - PORT=3000
       - DATABASE_URL=mysql://root:secret@mysql:3306/lti_db
+      # Same shared-dir path as k8s. The API link differs: in k8s the
+      # opendsa sidecar is in the same Pod (http://localhost:8080/...),
+      # here it is a separate container, so use the compose service name.
+      - OPENDSA_SHARED_DIR=/mnt/opendsa-shared
+      - CONFIG_API_LINK=http://opendsa:8080/api/configure/
     depends_on:
       - mysql
+      - opendsa
 
   web:
     build:
@@ -32,6 +41,31 @@ services:
       - /app/apps/web/node_modules
     environment:
       - NODE_ENV=development
+
+  # OpenDSA book compiler/serving container. Same runtime as the k8s image
+  # built from k8s/opendsa/Dockerfile.discovery (that is Dockerfile.server
+  # plus COPY . .), except the source is bind-mounted for local development
+  # instead of baked in.
+  opendsa:
+    build:
+      context: ${OPENDSA_SRC:-../OpenDSA-DevStack/opendsa}
+      dockerfile: Dockerfile.server
+    # Distinct tag so this never clobbers DevStack's opendsa/opendsa:latest.
+    image: opendsa/opendsa:dev
+    ports:
+      # Stands in for the /Books Ingress path in 60-ingress.yaml.
+      - "8080:8080"
+    volumes:
+      - ${OPENDSA_SRC:-../OpenDSA-DevStack/opendsa}:/opendsa
+      # Equivalent of the sidecar's subPath mount: only config/temp is
+      # shared with the backend, so opendsa's prebuilt config/*.json
+      # templates (and the rest of config/) stay visible.
+      - ./.opendsa-shared/config/temp:/opendsa/config/temp
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   mysql:
     image: mysql:8.0

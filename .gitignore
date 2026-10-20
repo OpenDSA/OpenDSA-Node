@@ -269,3 +269,7 @@ coverage/
 # Discovery k8s secrets (real values, never commit)
 k8s/10-secrets.yaml
 k8s/11-registry-secret.yaml
+
+# Local book-compile config handoff (mimics the k8s emptyDir). Generated
+# JSON ends up here at runtime; disposable.
+.opendsa-shared/
