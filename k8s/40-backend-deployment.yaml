@@ -4,7 +4,13 @@ metadata:
   name: backend
   namespace: 91762f26-opendsanode
 spec:
-  replicas: 2
+  # 1 replica, not 2: backend and opendsa share an emptyDir (see volumes
+  # below) for the book-compile config handoff - Discovery's only
+  # StorageClass is ReadWriteOnce, so this pairing can't be split across
+  # multiple pods/replicas without each replica having its own
+  # inconsistent copy of compiled book content. Revisit if that becomes a
+  # real problem.
+  replicas: 1
   selector:
     matchLabels:
       app: backend
@@ -15,6 +21,9 @@ spec:
     spec:
       imagePullSecrets:
         - name: opendsa-registry
+      volumes:
+        - name: opendsa-shared
+          emptyDir: {}
       containers:
         - name: backend
           image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
@@ -28,6 +37,18 @@ spec:
                 secretKeyRef:
                   name: opendsa-db-credentials
                   key: DATABASE_URL
+            # Book-compile config handoff to the opendsa sidecar (same
+            # Pod, so localhost - no Service hop needed). The backend
+            # always writes to $OPENDSA_SHARED_DIR/config/temp/<file>.json;
+            # see the volumeMounts below for how this lines up with
+            # opendsa's own CWD-relative "config/temp/<file>.json" lookup.
+            - name: OPENDSA_SHARED_DIR
+              value: /mnt/opendsa-shared
+            - name: CONFIG_API_LINK
+              value: http://localhost:8080/api/configure/
+          volumeMounts:
+            - name: opendsa-shared
+              mountPath: /mnt/opendsa-shared
           # Only /api/health is wired to probes - a transient DB hiccup
           # shouldn't crash-loop an otherwise-healthy Express process.
           # Check /api/health/db manually (see k8s/README.md) instead.
@@ -50,3 +71,41 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+        - name: opendsa
+          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            # subPath projects just the volume's internal "config/temp"
+            # subdirectory onto /opendsa/config/temp, instead of masking
+            # all of /opendsa/config (which ships pre-built templates
+            # opendsa needs for compiling). The backend container writes
+            # under opendsa-shared's root at "config/temp/<file>.json"
+            # (via OPENDSA_SHARED_DIR above), which is exactly this
+            # subPath - so both containers see the same file at
+            # "config/temp/<file>.json" relative to their own mount.
+            - name: opendsa-shared
+              mountPath: /opendsa/config/temp
+              subPath: config/temp
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          # Placeholder sizing - book compiles run as a subprocess inside
+          # this container and could be CPU/memory heavy; tune based on
+          # real usage.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

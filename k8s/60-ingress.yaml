@@ -14,8 +14,8 @@ spec:
     - host: 91762f26-opendsanode.discovery.cs.vt.edu
       http:
         paths:
-          # /api listed before / - Express expects the /api prefix intact,
-          # no rewrite-target annotation here.
+          # /api and /Books listed before / - Express/opendsa expect their
+          # path prefix intact, no rewrite-target annotation here.
           - path: /api
             pathType: Prefix
             backend:
@@ -23,6 +23,18 @@ spec:
                 name: backend
                 port:
                   number: 3000
+          # Routed straight to the opendsa sidecar (not through web/nginx) -
+          # see k8s/40-backend-deployment.yaml. Scoped to /Books specifically,
+          # not /, since opendsa's Flask app has a catch-all static-file
+          # route off its own working directory - a wide-open path would
+          # also expose things like its app.py and Makefile.
+          - path: /Books
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

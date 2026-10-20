@@ -1,0 +1,16 @@
+# Fronts the opendsa sidecar container in the backend Pod (see
+# 40-backend-deployment.yaml) so the Ingress can route /Books traffic to
+# it directly - internal backend -> opendsa calls go via localhost
+# instead, since they're in the same Pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opendsa
+  namespace: 91762f26-opendsanode
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
