@@ -17,7 +17,7 @@ spec:
         - name: opendsa-registry
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
           ports:
             - containerPort: 3000
           env:

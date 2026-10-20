@@ -17,7 +17,7 @@ spec:
         - name: opendsa-registry
       containers:
         - name: web
-          image: container.cs.vt.edu/jaden/opendsa-node/web:__TAG__
+          image: container.cs.vt.edu/jaden/opendsa-node/web:latest
           ports:
             - containerPort: 80
           readinessProbe:

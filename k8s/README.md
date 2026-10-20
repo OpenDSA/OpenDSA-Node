@@ -11,7 +11,10 @@ Every manifest already uses the real Namespace, `91762f26-opendsanode`
 Discovery dashboard). The Deployments/Job still use one placeholder:
 
 - `__TAG__`: the tag you used on `docker push` (see step 5 below) -
-  `latest` or a short commit SHA you choose yourself.
+  `latest` or a short commit SHA you choose yourself. `40-backend-deployment.yaml`,
+  `50-web-deployment.yaml`, and `30-migrate-job.yaml` currently point at
+  `:latest`, the first tag pushed - update these three files (not this
+  placeholder note) whenever you push a different tag.
 
 There's no GitLab CI/CD here - this project has no runners available, so
 images are built and pushed manually (per `DiscoveryClusteryInstructions.pdf`),

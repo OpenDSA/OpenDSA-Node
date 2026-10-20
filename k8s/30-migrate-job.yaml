@@ -25,7 +25,7 @@ spec:
         - name: opendsa-registry
       containers:
         - name: migrate
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:__TAG__
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
           command: ["npx", "prisma", "migrate", "deploy"]
           env:
             - name: DATABASE_URL
