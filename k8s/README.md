@@ -169,10 +169,12 @@ scale it to 0 first and check logs/exec instead.
 ## Notes / things to revisit
 
 - StorageClass for the MySQL PVC - confirmed, it's `ceph-rbd`.
-- Ingress stays VPN/on-campus only for now - no whitelist annotation. That
-  annotation doesn't just let you in, it opens the whole thing to the
-  public internet, which isn't worth it just to skip connecting to VPN.
-  Use `kubectl port-forward` or the VPN if you need off-campus access.
+- Ingress whitelist annotation is now **on** (public internet, not just
+  VT) - turned on 2026-10-19 at stakeholder request. Means the app is
+  reachable without VPN, but also means it's open to literally anyone,
+  not just the team - there's no scoped allowlist option, it's all-or-
+  nothing. To lock it back down: comment out the annotation in
+  `60-ingress.yaml` and `kubectl apply` again.
 - opendsa's resource requests/limits in `40-backend-deployment.yaml` are
   guesses - haven't actually run a real compile yet to know what it needs.
   Tune once we've tested it for real.

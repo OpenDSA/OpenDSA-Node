@@ -3,11 +3,11 @@ kind: Ingress
 metadata:
   name: opendsa
   namespace: 91762f26-opendsanode
-  # Uncomment the annotations block below to allow off-campus/non-VPN access
-  # (opens the Ingress to ALL traffic - see k8s/README.md for the tradeoff
-  # before enabling):
-  # annotations:
-  #   nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
+  # Off-campus/non-VPN access enabled at stakeholder request (opens the
+  # Ingress to ALL traffic, not just VT - see k8s/README.md for the
+  # tradeoff). Comment this back out + reapply to lock it back down.
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
 spec:
   ingressClassName: nginx
   rules:
