@@ -54,10 +54,14 @@ Plan to use Prisma as an ORM
    npx tsx prisma/seed.ts
    ```
 
+   This seeds a demo organization and CS 1114 course, 50 academic students,
+   three staff, five 2023 terms, two dummy LMS instances, six course offerings,
+   and 318 enrollments, based on the legacy Rails `db:populate` factories.
+
+   For local development only; rerun one seed process at a time to reuse existing data.
+
 6. Optionally, inspect the database:
 
    ```bash
    npx prisma studio
    ```
-
-The seed script adds sample users, exercises, exercise instances, attempts, and progress records for local development.
