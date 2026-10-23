@@ -32,6 +32,7 @@ services:
       - /app/apps/web/node_modules
     environment:
       - NODE_ENV=development
+      - API_PROXY_TARGET=http://backend:3000
 
   mysql:
     image: mysql:8.0

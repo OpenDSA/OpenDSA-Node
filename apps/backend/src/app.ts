@@ -14,9 +14,9 @@ app.use("/api", apiRouter);
 // Basic universal error handler middleware
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Unhandled error:", err);
+  // Do not log request/parser errors: they may contain submitted credentials.
   const status = "status" in err && typeof err.status === "number" ? err.status : 500;
   res.status(status).json({
-    error: err.message || "Internal Server Error",
+    error: status === 400 ? "Invalid request body." : "Internal Server Error",
   });
 });
