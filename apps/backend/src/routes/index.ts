@@ -2,6 +2,9 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { generateCourseRouter } from "../course_creation";
 
+import { courseOfferingsRouter } from "./course-offerings";
+import { courseOptionsRouter } from "./course-options";
+
 export const apiRouter = Router();
 
 
@@ -20,4 +23,6 @@ apiRouter.get("/health/db", async (_req, res) => {
 
 
 // Add router files for each endpoint group here.
+apiRouter.use(courseOptionsRouter);
+apiRouter.use(courseOfferingsRouter);
 apiRouter.use(generateCourseRouter);

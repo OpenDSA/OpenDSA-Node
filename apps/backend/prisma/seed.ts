@@ -1,10 +1,15 @@
 
 import { PrismaClient } from "@prisma/client";
+import { seedAcademic } from "./seed-academic";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  if (![undefined, "development", "test"].includes(process.env.NODE_ENV)) {
+    throw new Error("Development seed requires NODE_ENV=development or test (or unset).");
+  }
   console.log("Seeding OpenDSA database...");
+  await seedAcademic(prisma);
 
   // 1. Create or find the Student role
   let studentRole = await prisma.globalRoles.findFirst({
@@ -158,7 +163,7 @@ async function main() {
               user_id: student.id,
               exercise_instance_id: instance.id,
               worth_credit: true,
-              time_done: new Date(),
+              time_done: new Date("2023-01-01T12:00:00Z"),
               time_taken: 20 + attemptIndex * 15,
               count_hints: correct ? 0 : 1,
               hint_used: !correct,
@@ -183,7 +188,7 @@ async function main() {
       // 6. Create or update progress for this student/exercise
       const totalCorrect = attemptResults.filter(Boolean).length;
       const score = Math.round((totalCorrect / attemptResults.length) * 100);
-      const now = new Date();
+      const now = new Date("2023-01-01T12:00:00Z");
 
       await prisma.odsaExerciseProgresses.upsert({
         where: {
@@ -192,13 +197,7 @@ async function main() {
             exercise_instance_id: instance.id,
           },
         },
-        update: {
-          current_score: score,
-          highest_score: score,
-          total_correct: totalCorrect,
-          total_worth_credit: attemptResults.length,
-          last_done: now,
-        },
+        update: {}, // Preserve existing progress, including subsequent development activity.
         create: {
           user_id: student.id,
           exercise_instance_id: instance.id,

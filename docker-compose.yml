@@ -41,6 +41,7 @@ services:
       - /app/apps/web/node_modules
     environment:
       - NODE_ENV=development
+      - API_PROXY_TARGET=http://backend:3000
 
   # OpenDSA book compiler/serving container. Same runtime as the k8s image
   # built from k8s/opendsa/Dockerfile.discovery (that is Dockerfile.server

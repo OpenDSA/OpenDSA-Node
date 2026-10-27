@@ -7,10 +7,10 @@ export default defineConfig({
     port: 5173,
     host: true, 
     proxy: {
-      '/api': 'http://backend:3000',
       // Mirrors the Ingress split in k8s/60-ingress.yaml so compiled books
       // can be viewed from the dev server instead of :8080 directly.
-      '/Books': 'http://opendsa:8080'
+      '/Books': 'http://opendsa:8080',
+      '/api': process.env.API_PROXY_TARGET || 'http://localhost:3000'
     }
   }
 });
