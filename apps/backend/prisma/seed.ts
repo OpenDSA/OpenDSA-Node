@@ -1,6 +1,13 @@
 
 import { PrismaClient } from "@prisma/client";
 import { seedAcademic } from "./seed-academic";
+import { seedBook } from "./seed-book";
+
+try {
+  process.loadEnvFile?.();
+} catch {
+  // Ignore if .env is not present; environment variables may be set directly.
+}
 
 const prisma = new PrismaClient();
 
@@ -10,6 +17,7 @@ async function main() {
   }
   console.log("Seeding OpenDSA database...");
   await seedAcademic(prisma);
+  await seedBook(prisma);
 
   // 1. Create or find the Student role
   let studentRole = await prisma.globalRoles.findFirst({

@@ -121,7 +121,26 @@ Plan to use Prisma as an ORM
 
    This seeds a demo organization and CS 1114 course, 50 academic students,
    three staff, five 2023 terms, two dummy LMS instances, six course offerings,
-   and 318 enrollments, based on the legacy Rails `db:populate` factories.
+   318 enrollments, and a sample OpenDSA book (`CS 1114 OpenDSA Book`) with
+   chapters, modules, sections, and exercises.
+
+   To seed the book with a real Canvas testing course and API key, set the
+   following in `apps/backend/.env` before running `npx tsx prisma/seed.ts`:
+
+   ```env
+   SEED_CANVAS_URL="https://canvas.instructure.com"
+   SEED_CANVAS_COURSE_ID="12345"
+   SEED_CANVAS_API_KEY="your_canvas_api_token"
+   ```
+
+   The seed output logs the `instBookId` and `instructorUserId` so you can test
+   course generation via:
+
+   ```bash
+   curl -X POST http://localhost:3000/api/inst_books/<instBookId>/generate_course \
+     -H "Content-Type: application/json" \
+     -d '{"userId": <instructorUserId>}'
+   ```
 
    For local development only; rerun one seed process at a time to reuse existing data.
 

@@ -62,5 +62,18 @@ export async function triggerOpenDsaCompile(
     );
   }
 
-  return (await response.json()) as OpenDsaCompileResponse;
+  const data = (await response.json()) as OpenDsaCompileResponse;
+  if (
+    data.ok === false ||
+    (typeof data.message === "number" && data.message !== 0)
+  ) {
+    const details = JSON.stringify(
+      data.stderr_compressed ?? data.stdout_compressed ?? data
+    );
+    throw new Error(
+      `OpenDSA configure.py failed (exit code ${String(data.message)}): ${details}`
+    );
+  }
+
+  return data;
 }

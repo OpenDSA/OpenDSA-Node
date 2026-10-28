@@ -86,6 +86,7 @@ export function serializeBookConfig(
                 points: Number(sectionExercise.points),
                 threshold: Number(sectionExercise.threshold),
               };
+              delete exerciseEntry.partial_credit;
 
               const parsedExOptions = parseJsonValue(sectionExercise.options);
               if (parsedExOptions !== null) {

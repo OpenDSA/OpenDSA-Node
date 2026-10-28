@@ -41,7 +41,8 @@ export async function ensureCanvasLtiTool(
     consumer_key: params.consumerKey,
     shared_secret: params.consumerSecret,
     url: params.launchUrl,
-    client_id: params.clientId,
+    // client_id is only present for LTI 1.3 supported LMS instances
+    ...(params.clientId ? { client_id: params.clientId } : {}),
     resource_selection: {
       enabled: true,
       url: params.resourceSelectionUrl,
