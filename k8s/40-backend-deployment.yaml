@@ -37,6 +37,13 @@ spec:
                 secretKeyRef:
                   name: opendsa-db-credentials
                   key: DATABASE_URL
+            # without this express-session falls back to a random secret on
+            # every process start, logging everyone out on each restart
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-db-credentials
+                  key: SESSION_SECRET
             # Book-compile config handoff to the opendsa sidecar (same
             # Pod, so localhost - no Service hop needed). The backend
             # always writes to $OPENDSA_SHARED_DIR/config/temp/<file>.json;
