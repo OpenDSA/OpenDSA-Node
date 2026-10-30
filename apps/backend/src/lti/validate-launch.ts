@@ -17,12 +17,17 @@ export interface LtiLaunchValidationResult {
 }
 
 // todo: actually look this up from the db (LmsInstances / LmsAccesses) based on
-// the consumer key. this is what get_oauth_creds did in the old code
+// the consumer key. this is what get_oauth_creds did in the old code.
+// takes it as a param with this as the default so tests can swap in a fake one
+// without touching the db
 async function getOauthCreds(consumerKey: string): Promise<string | null> {
   throw new Error("todo: look up consumer secret for this key");
 }
 
-export async function validateLtiLaunch(req: Request): Promise<LtiLaunchValidationResult> {
+export async function validateLtiLaunch(
+  req: Request,
+  lookupSecret: (consumerKey: string) => Promise<string | null> = getOauthCreds
+): Promise<LtiLaunchValidationResult> {
   const params = req.body as Record<string, string>;
 
   const consumerKey = params["oauth_consumer_key"];
@@ -30,7 +35,7 @@ export async function validateLtiLaunch(req: Request): Promise<LtiLaunchValidati
     return { valid: false, message: "no consumer key" };
   }
 
-  const secret = await getOauthCreds(consumerKey);
+  const secret = await lookupSecret(consumerKey);
   if (!secret) {
     return { valid: false, message: "consumer key wasn't recognized" };
   }
@@ -56,7 +61,14 @@ export async function validateLtiLaunch(req: Request): Promise<LtiLaunchValidati
     return { valid: false, message: "oauth signature was invalid" };
   }
 
-  // old rails code checked if the request was older than 1440 min (24 hrs)
+  // old rails code checked if the request was older than 1440 min (24 hrs).
+  // turns out this check basically never gets here in practice right now -
+  // ims-lti's default in-memory nonce store already rejects anything older
+  // than 5 min on its own (lib/memory-nonce-store.js, EXPIRE_IN_SEC = 5*60),
+  // way stricter than the old 24hr window. found this from writing a test for
+  // this file, not something i expected. need to talk to ben/team about
+  // whether 5 min is fine for us or if we need a custom nonce store with a
+  // longer window to match old behavior
   const timestamp = Number(params["oauth_timestamp"]);
   const ageMinutes = (Date.now() / 1000 - timestamp) / 60;
   if (!timestamp || ageMinutes > 1440) {
