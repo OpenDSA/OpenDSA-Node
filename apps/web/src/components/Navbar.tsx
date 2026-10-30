@@ -1,6 +1,14 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { useAuth } from "../auth/Auth";
+import { Link, useNavigate } from "react-router-dom";
 
 function Navbar() {
+  const { user, logout } = useAuth(); const navigate = useNavigate();
+  const [error, setError] = useState("");
+  async function signOut() {
+    try { await logout(); setError(""); navigate("/login"); }
+    catch { setError("Sign out failed. Please retry."); }
+  }
   return (
     <nav className="navbar">
       <div className="navbar-left">
@@ -29,7 +37,9 @@ function Navbar() {
 
         <div className="navbar-right">
             <span aria-label="Admin Settings" title="Admin Settings">⚙</span>
-            <span>Account</span>
+            {user ? <><span>{user.first_name || user.email}</span><button type="button" onClick={signOut}>Sign out</button></>
+              : <Link to="/login">Sign in</Link>}
+            {error && <span role="alert">{error}</span>}
       </div>
     </nav>
   );

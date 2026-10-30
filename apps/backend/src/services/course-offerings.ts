@@ -96,7 +96,7 @@ export async function createCourseOffering(input: CreateCourseOfferingInput, own
     } });
     const instBookId = input.book_instance_id === undefined ? undefined :
       await cloneBook(tx, input.book_instance_id, offering.id, ownerId!);
-    if (ownerId && instBookId !== undefined) {
+    if (ownerId) {
       const role = await tx.courseRoles.findFirst({ where: { name: "Instructor" } });
       if (!role) throw new CourseOfferingError(400, "Instructor role is missing; run the seed.");
       await tx.courseEnrollments.create({ data: {
@@ -117,18 +117,12 @@ export function courseOfferingError(error: unknown): { status: number; error: st
   return { status: 500, error: "Unable to create the course offering." };
 }
 
-// This explicit development identity is not a substitute for authentication.
-export async function getCurrentInstructor() {
-  if (process.env.NODE_ENV !== "development" || process.env.LOCAL_COURSE_GENERATION !== "true") {
-    throw new CourseOfferingError(403, "Local course generation is disabled.");
+export async function getGenerationContext(lmsInstanceId: number, userId: number) {
+  if (![undefined, "development", "test"].includes(process.env.NODE_ENV)) {
+    throw new CourseOfferingError(503, "Content-only generation is development-only.");
   }
-  const user = await prisma.users.findUnique({ where: { email: "seed-academic-instructor@example.com" } });
-  if (!user) throw new CourseOfferingError(400, "Run the development seed to create the instructor.");
-  return user;
-}
-
-export async function getGenerationContext(lmsInstanceId: number) {
-  const user = await getCurrentInstructor();
+  const user = await prisma.users.findUnique({ where: { id: userId } });
+  if (!user) throw new CourseOfferingError(401, "Sign in required.");
   // Local content-generation tests deliberately omit LTI registration/launches.
   const settings = {
     launchUrl: "", resourceSelectionUrl: "", extrtoolLaunchBaseUrl: "",
@@ -145,7 +139,7 @@ export async function getGenerationContext(lmsInstanceId: number) {
     lms_instance_id_user_id: { lms_instance_id: lmsInstanceId, user_id: user.id },
   } });
   if (!access?.access_token || access.access_token === "seed-canvas-api-key") {
-    throw new CourseOfferingError(400, "Configure the seeded instructor's Canvas API token for this LMS instance.");
+    throw new CourseOfferingError(400, "Configure your Canvas API token for this LMS instance.");
   }
   return { userId: user.id, ...settings };
 }

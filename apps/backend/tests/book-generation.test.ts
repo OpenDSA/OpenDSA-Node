@@ -4,13 +4,13 @@ import { prisma } from "../src/db";
 import { cloneBook } from "../src/services/clone-book";
 import { getGenerationContext } from "../src/services/course-offerings";
 
-test("local identity is disabled in production even if opted in", async () => {
+test("development-only content generation remains disabled in production", async () => {
   const nodeEnv = process.env.NODE_ENV;
   const enabled = process.env.LOCAL_COURSE_GENERATION;
   try {
     process.env.NODE_ENV = "production";
     process.env.LOCAL_COURSE_GENERATION = "true";
-    await assert.rejects(getGenerationContext(1), /disabled/);
+    await assert.rejects(getGenerationContext(1, 6), /development-only/);
   } finally {
     if (nodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = nodeEnv;
     if (enabled === undefined) delete process.env.LOCAL_COURSE_GENERATION; else process.env.LOCAL_COURSE_GENERATION = enabled;

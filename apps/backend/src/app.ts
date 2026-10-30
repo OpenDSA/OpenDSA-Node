@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import { authSession, initializePassport, passportSession } from "./auth";
 import { apiRouter } from "./routes";
 
 export const app = express();
@@ -6,6 +7,10 @@ export const app = express();
 // Express and core library setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(authSession);
+app.use(initializePassport);
+app.use(passportSession);
 
 // API routes
 app.use("/api", apiRouter);

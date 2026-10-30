@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { hash } from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
 // Run sequentially: role names, time zones, courses and offerings lack unique keys.
 // Existing records are reused without changing their permissions or configuration.
 export async function seedAcademic(prisma: PrismaClient) {
+  const password = process.env.SEED_AUTH_PASSWORD;
+  if (password && (Buffer.byteLength(password, "utf8") < 8 || Buffer.byteLength(password, "utf8") > 72)) {
+    throw new Error("SEED_AUTH_PASSWORD must be 8–72 UTF-8 bytes.");
+  }
+  const passwordHash = password ? await hash(password, 10) : undefined;
   const roles = [];
   for (const name of ["Administrator", "Instructor", "Researcher", "Regular User"]) {
     const admin = name === "Administrator";
@@ -71,6 +77,13 @@ export async function seedAcademic(prisma: PrismaClient) {
       global_role_id: account.role.id, time_zone_id: zone.id, confirmed_at: new Date("2023-01-01T00:00:00Z"),
       // Empty password default: these fixtures cannot authenticate as Rails users.
     } }));
+  }
+  if (passwordHash) {
+    for (const user of users.slice(0, 3)) {
+      // Never replace an existing user's password during a seed rerun.
+      await prisma.users.updateMany({ where: { id: user.id, encrypted_password: "" },
+        data: { encrypted_password: passwordHash } });
+    }
   }
   const courseKey = { organization_id: organization.id, slug: "seed-cs1114" };
   const course = await prisma.courses.findFirst({ where: courseKey, orderBy: { id: "asc" } }) ??

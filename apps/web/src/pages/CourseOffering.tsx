@@ -1,3 +1,4 @@
+import { authFetch } from "../auth/Auth";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -30,7 +31,7 @@ export default function CourseOffering() {
     if (inFlight.current || !window.confirm("Generate this book's modules and assignments in the Canvas course shown?")) return;
     inFlight.current = true; setGenerating(true); setError(""); setBookUrl("");
     try {
-      const response = await fetch(`/api/course-offerings/${id}/generate`, { method: "POST" });
+      const response = await authFetch(`/api/course-offerings/${id}/generate`, { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
       setBookUrl(body.data.book_url);

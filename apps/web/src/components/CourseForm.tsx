@@ -1,3 +1,4 @@
+import { authFetch } from "../auth/Auth";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -92,7 +93,7 @@ function CourseForm() {
                 label: label.trim(), lms_instance_id: Number(lmsInstance), lms_course_num: lmsCourseId.trim(),
                 book_instance_id: Number(bookInstance),
             });
-            const response = await fetch("/api/course-offerings", {
+            const response = await authFetch("/api/course-offerings", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: payload,
             });

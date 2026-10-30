@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import { AuthProvider, RequireAuth } from "./auth/Auth";
+import Login from "./pages/Login";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -29,14 +31,16 @@ function App() {
 
   return (
     <BrowserRouter>
+      <AuthProvider>
       <Navbar />
       <main>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<BrowseCourses />} />
-          <Route path="/courses/new" element={<CreateCourse />} />
-          <Route path="/course-offerings/:id" element={<CourseOffering />} />
-          <Route path="/books/new" element={<CreateBook />} />
+          <Route path="/courses/new" element={<RequireAuth instructor><CreateCourse /></RequireAuth>} />
+          <Route path="/course-offerings/:id" element={<RequireAuth><CourseOffering /></RequireAuth>} />
+          <Route path="/books/new" element={<RequireAuth instructor><CreateBook /></RequireAuth>} />
           <Route path="/guides" element={<InstructorGuides />} />
           <Route path="/about" element={<About />} />
           <Route path="/official" element={<Official />} />
@@ -54,6 +58,7 @@ function App() {
       {import.meta.env.DEV && (
         <p>Backend status: {status}</p>
       )}
+      </AuthProvider>
     </BrowserRouter>
   );
 }
