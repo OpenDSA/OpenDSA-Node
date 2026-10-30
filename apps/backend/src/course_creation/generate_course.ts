@@ -66,7 +66,7 @@ export async function generateCourse(
 
   const { consumer_key: consumerKey, consumer_secret: consumerSecret } =
     userLmsAccess;
-  if (!consumerKey || !consumerSecret) {
+  if (!input.canvasContentOnly && (!consumerKey || !consumerSecret)) {
     throw new Error(
       `LmsAccess for user_id=${user.id}, lms_instance_id=${lmsInstance.id} is missing consumer_key/consumer_secret`
     );
@@ -98,21 +98,23 @@ export async function generateCourse(
     },
   });
 
-  await ensureCanvasLtiTool(canvasClient, {
+  if (!input.canvasContentOnly) await ensureCanvasLtiTool(canvasClient, {
     lmsCourseId,
     instBookId: instBook.id,
     courseOfferingId: courseOffering.id,
     launchUrl: input.launchUrl,
     resourceSelectionUrl: input.resourceSelectionUrl,
     clientId: lmsInstance.client_id,
-    consumerKey,
-    consumerSecret,
+    consumerKey: consumerKey!,
+    consumerSecret: consumerSecret!,
   });
 
   await syncCanvasChapters(canvasClient, {
     lmsCourseId,
     instBookId: instBook.id,
     chapters: instBook.inst_chapters,
+    canvasContentOnly: input.canvasContentOnly,
+    bookPublicBaseUrl: input.bookPublicBaseUrl,
     buildPath,
     launchUrl: input.launchUrl,
     isZeroPt,
@@ -120,13 +122,7 @@ export async function generateCourse(
 
   const compiledAt = new Date();
   instBook.last_compiled = compiledAt;
-  await prisma.instBooks.update({
-    where: { id: instBook.id },
-    data: {
-      last_compiled: compiledAt,
-      updated_at: compiledAt,
-    },
-  });
+
 
   // 3. Serialize book configuration JSON
   const bookConfig = serializeBookConfig(
@@ -148,6 +144,14 @@ export async function generateCourse(
     configPath,
     buildPath,
     rake: false,
+  });
+
+  await prisma.instBooks.update({
+    where: { id: instBook.id },
+    data: {
+      last_compiled: compiledAt,
+      updated_at: compiledAt,
+    },
   });
 
   return {

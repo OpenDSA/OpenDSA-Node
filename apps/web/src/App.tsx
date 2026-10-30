@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
 import Home from "./pages/Home";
+import CourseOffering from "./pages/CourseOffering";
 import CreateCourse from "./pages/CreateCourse";
 import CreateBook from "./pages/CreateBook";
 import BrowseCourses from "./pages/BrowseCourses";
@@ -34,6 +35,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<BrowseCourses />} />
           <Route path="/courses/new" element={<CreateCourse />} />
+          <Route path="/course-offerings/:id" element={<CourseOffering />} />
           <Route path="/books/new" element={<CreateBook />} />
           <Route path="/guides" element={<InstructorGuides />} />
           <Route path="/about" element={<About />} />

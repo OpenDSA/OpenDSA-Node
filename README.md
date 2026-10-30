@@ -150,4 +150,4 @@ Plan to use Prisma as an ORM
    npx prisma studio
    ```
 
-The New Course Offering form loads dropdowns from the database and saves offerings through `POST /api/course-offerings`. Start the backend with `npm run dev` from `apps/backend` and the frontend with `npm run dev:web` from the repository root, then open http://localhost:5173. Book selection and LMS tokens remain disabled; saved offerings can be inspected in Prisma Studio.
+The course-offering form follows the legacy save-then-generate flow: Submit creates or reuses an offering matching course, term, label, and LMS instance, then opens its details page. Reused offerings keep their existing book and Canvas course ID; a different label may target the same Canvas course. Only the separate **Generate Canvas Course** button and confirmation invoke Canvas synchronization and compilation. Local generation uses the seeded instructor’s Canvas API token without LTI registration; direct book links do not provide student authentication or grade return.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
+interface Book { id: number; title: string }
 interface Organization { id: number; name: string }
 interface Course { id: number; name: string; number: string; organization_id: number }
 interface Term { id: number; season: number; year: number }
@@ -15,6 +16,8 @@ async function loadOptions<T>(path: string, signal: AbortSignal): Promise<T[]> {
 }
 
 function CourseForm() {
+    const [bookInstance, setBookInstance] = useState("");
+    const [books, setBooks] = useState<Book[]>([]);
     const [organization, setOrganization] = useState("");
     const [course, setCourse] = useState("");
     const [term, setTerm] = useState("");
@@ -38,11 +41,13 @@ function CourseForm() {
         setLoading(true);
         setOptionsError("");
         Promise.all([
+            loadOptions<Book>("book-instances", controller.signal),
             loadOptions<Organization>("organizations", controller.signal),
             loadOptions<Term>("terms", controller.signal),
             loadOptions<LmsInstance>("lms-instances", controller.signal),
-        ]).then(([orgs, academicTerms, instances]) => {
+        ]).then(([bookOptions, orgs, academicTerms, instances]) => {
             if (controller.signal.aborted) return;
+            setBooks(bookOptions);
             setOrganizations(orgs);
             setTerms(academicTerms);
             setLmsInstances(instances);
@@ -71,7 +76,7 @@ function CourseForm() {
         event.preventDefault();
         if (inFlight.current) return;
         setError("");
-        if (!organization || !course || !term || !label.trim() || !lmsInstance || !lmsCourseId.trim()) {
+        if (!bookInstance || !organization || !course || !term || !label.trim() || !lmsInstance || !lmsCourseId.trim()) {
             setError("Complete all required fields.");
             return;
         }
@@ -82,16 +87,18 @@ function CourseForm() {
         inFlight.current = true;
         setSubmitting(true);
         try {
+            const payload = JSON.stringify({
+                organization_id: Number(organization), course_id: Number(course), term_id: Number(term),
+                label: label.trim(), lms_instance_id: Number(lmsInstance), lms_course_num: lmsCourseId.trim(),
+                book_instance_id: Number(bookInstance),
+            });
             const response = await fetch("/api/course-offerings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    organization_id: Number(organization), course_id: Number(course), term_id: Number(term),
-                    label: label.trim(), lms_instance_id: Number(lmsInstance), lms_course_num: lmsCourseId.trim(),
-                }),
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: payload,
             });
             const body = await response.json();
             if (!response.ok) throw new Error(body.error || "Unable to create the course offering.");
+            window.location.assign(body.url);
 
         } catch (error) {
             setError(error instanceof Error ? error.message : "Unable to create the course offering.");
@@ -137,7 +144,11 @@ function CourseForm() {
                 </div>
                 <div>
                     <label htmlFor="bookInstance">Book Instance: </label>
-                    <select id="bookInstance" name="bookInstance" disabled><option value="">Select</option></select>
+                    <select id="bookInstance" name="bookInstance" required value={bookInstance}
+                        onChange={event => setBookInstance(event.target.value)}>
+                        <option value="">Select</option>
+                        {books.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+                    </select>
                 </div>
                 <div>
                     <label htmlFor="lmsInstance">LMS Instance: </label>

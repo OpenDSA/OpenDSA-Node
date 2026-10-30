@@ -73,6 +73,8 @@ export async function syncCanvasChapters(
     buildPath: string;
     launchUrl: string;
     isZeroPt: boolean;
+    canvasContentOnly?: boolean;
+    bookPublicBaseUrl?: string;
   }
 ): Promise<void> {
   for (const chapter of params.chapters) {
@@ -126,6 +128,8 @@ export async function syncCanvasChapters(
         buildPath: params.buildPath,
         launchUrl: params.launchUrl,
         isZeroPt: params.isZeroPt,
+        canvasContentOnly: params.canvasContentOnly,
+        bookPublicBaseUrl: params.bookPublicBaseUrl,
       });
       moduleItemPosition += 1;
     }
@@ -150,6 +154,8 @@ export async function syncCanvasModuleItem(
     buildPath: string;
     launchUrl: string;
     isZeroPt: boolean;
+    canvasContentOnly?: boolean;
+    bookPublicBaseUrl?: string;
   }
 ): Promise<void> {
   const { chapter, chapterModule } = params;
@@ -171,7 +177,8 @@ export async function syncCanvasModuleItem(
     custom_module_title: title,
   }).toString();
 
-  const itemLaunchUrl = `${params.launchUrl}?${launchQuery}`;
+  const bookUrl = `${(params.bookPublicBaseUrl || "http://localhost:8080/Books").replace(/\/+$/, "")}/${params.buildPath.split("/").map(encodeURIComponent).join("/")}/html/${encodeURIComponent(moduleFileName)}.html`;
+  const itemLaunchUrl = params.canvasContentOnly ? bookUrl : `${params.launchUrl}?${launchQuery}`;
 
   const isGradable = chapterModule.inst_sections.some((sec) =>
     Boolean(sec.gradable)
@@ -184,8 +191,13 @@ export async function syncCanvasModuleItem(
       : 0;
 
     const assignmentPayload: Record<string, unknown> = {
-      submission_types: ["external_tool"],
-      external_tool_tag_attributes: { url: itemLaunchUrl },
+      ...(params.canvasContentOnly ? {
+        submission_types: ["none"],
+        description: `<p><a href="${bookUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">Open compiled book module</a></p>`,
+      } : {
+        submission_types: ["external_tool"],
+        external_tool_tag_attributes: { url: itemLaunchUrl },
+      }),
       points_possible: pointsPossible,
     };
 
@@ -213,7 +225,7 @@ export async function syncCanvasModuleItem(
           ...assignmentPayload,
           name: title,
           assignment_group_id: chapter.lms_assignment_group_id,
-          description: "",
+          ...(params.canvasContentOnly ? {} : { description: "" }),
         }
       );
       const createdModuleItem = await client.createModuleItem(
@@ -248,7 +260,7 @@ export async function syncCanvasModuleItem(
       params.lmsChapterId,
       {
         title,
-        type: "ExternalTool",
+        type: params.canvasContentOnly ? "ExternalUrl" : "ExternalTool",
         position: params.moduleItemPosition,
         external_url: itemLaunchUrl,
         indent: 0,

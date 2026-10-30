@@ -5,6 +5,8 @@ import { Prisma } from "@prisma/client";
 // ============================================================================
 
 export interface GenerateCourseInput {
+  canvasContentOnly?: boolean;
+  bookPublicBaseUrl?: string;
   instBookId: number;
   launchUrl: string;
   resourceSelectionUrl: string;
