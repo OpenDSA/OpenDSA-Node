@@ -10,18 +10,34 @@
 
 import { Request } from "express";
 import { Provider } from "ims-lti";
+import { prisma } from "../db";
 
 export interface LtiLaunchValidationResult {
   valid: boolean;
   message?: string;
 }
 
-// todo: actually look this up from the db (LmsInstances / LmsAccesses) based on
-// the consumer key. this is what get_oauth_creds did in the old code.
-// takes it as a param with this as the default so tests can swap in a fake one
-// without touching the db
+// port of get_oauth_creds from lti_controller.rb line 868. checks LmsInstance
+// first (lms_instance.rb get_oauth_creds), then falls back to LmsAccess
+// (lms_access.rb get_oauth_creds) if that didnt find anything. old code
+// returned a {key => secret} hash but we only ever use the secret so just
+// returning that directly
 async function getOauthCreds(consumerKey: string): Promise<string | null> {
-  throw new Error("todo: look up consumer secret for this key");
+  const lmsInstance = await prisma.lmsInstances.findFirst({
+    where: { consumer_key: consumerKey },
+  });
+  if (lmsInstance?.consumer_key && lmsInstance.consumer_secret) {
+    return lmsInstance.consumer_secret;
+  }
+
+  const lmsAccess = await prisma.lmsAccesses.findFirst({
+    where: { consumer_key: consumerKey },
+  });
+  if (lmsAccess?.consumer_secret) {
+    return lmsAccess.consumer_secret;
+  }
+
+  return null;
 }
 
 export async function validateLtiLaunch(
