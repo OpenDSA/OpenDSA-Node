@@ -1,3 +1,4 @@
+import { signInForTest } from "./auth-client";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
@@ -12,9 +13,10 @@ test("offering validation and legacy find-or-create behavior", async () => {
   const address = server.address();
   assert(address && typeof address !== "string");
   const url = `http://127.0.0.1:${address.port}/api/course-offerings`;
+  const authHeaders = await signInForTest(`http://127.0.0.1:${address.port}`);
   async function post(body: unknown) {
     const response = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(body),
     });
     return { status: response.status, body: await response.json() };
   }

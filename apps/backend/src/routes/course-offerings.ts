@@ -1,15 +1,18 @@
+import { requireAuthentication, requireInstructor, requireCsrf, canManageOffering } from "../auth";
 import { Router } from "express";
-import { createCourseOffering, parseCourseOffering, courseOfferingError, getCurrentInstructor, getGenerationContext, generateBook } from "../services/course-offerings";
+import { createCourseOffering, parseCourseOffering, courseOfferingError, getGenerationContext, generateBook } from "../services/course-offerings";
 import { prisma } from "../db";
 
 export const courseOfferingsRouter = Router();
 
-courseOfferingsRouter.post("/course-offerings", async (req, res) => {
+courseOfferingsRouter.post("/course-offerings", requireAuthentication, requireInstructor, requireCsrf, async (req, res) => {
   try {
     const input = parseCourseOffering(req.body);
     // Saving/reusing an offering never calls Canvas or requires its credentials.
-    const owner = input.book_instance_id === undefined ? undefined : await getCurrentInstructor();
-    const offering = await createCourseOffering(input, owner?.id);
+    const offering = await createCourseOffering(input, req.user!.id);
+    if (offering.reused && !await canManageOffering(req.user!, offering.id)) {
+      res.status(403).json({ error: "You cannot manage this offering." }); return;
+    }
     res.status(offering.reused ? 200 : 201).json({ data: offering, url: `/course-offerings/${offering.id}` });
   } catch (error) {
     const result = courseOfferingError(error);
@@ -33,21 +36,20 @@ courseOfferingsRouter.get("/course-offerings/:id", async (req, res) => {
   } catch { res.status(500).json({ error: "Unable to load the offering." }); }
 });
 
-courseOfferingsRouter.post("/course-offerings/:id/generate", async (req, res) => {
+courseOfferingsRouter.post("/course-offerings/:id/generate", requireAuthentication, requireCsrf, async (req, res) => {
   try {
     if (!/^[1-9]\d*$/.test(String(req.params.id)) || Number(req.params.id) > 2147483647) {
       res.status(400).json({ error: "Invalid offering ID." }); return;
     }
-    // Gate before looking up records; this endpoint is for local testing only.
-    if (process.env.NODE_ENV !== "development" || process.env.LOCAL_COURSE_GENERATION !== "true") {
-      res.status(403).json({ error: "Local course generation is disabled." }); return;
+    if (!await canManageOffering(req.user!, Number(req.params.id))) {
+      res.status(403).json({ error: "You cannot manage this offering." }); return;
     }
     const offering = await prisma.courseOfferings.findUnique({ where: { id: Number(req.params.id) },
       include: { inst_books: { select: { id: true, user_id: true } } } });
     if (!offering) { res.status(404).json({ error: "Offering not found." }); return; }
-    const context = await getGenerationContext(offering.lms_instance_id);
-    if (offering.inst_books.length !== 1 || offering.inst_books[0].user_id !== context.userId) {
-      res.status(403).json({ error: "Offering must have one book owned by the seeded instructor." }); return;
+    const context = await getGenerationContext(offering.lms_instance_id, req.user!.id);
+    if (offering.inst_books.length !== 1) {
+      res.status(403).json({ error: "Offering must have exactly one book." }); return;
     }
     try {
       const result = await generateBook(offering.inst_books[0].id, context);
