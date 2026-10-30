@@ -77,19 +77,14 @@ export async function validateLtiLaunch(
     return { valid: false, message: "oauth signature was invalid" };
   }
 
-  // old rails code checked if the request was older than 1440 min (24 hrs).
-  // turns out this check basically never gets here in practice right now -
-  // ims-lti's default in-memory nonce store already rejects anything older
-  // than 5 min on its own (lib/memory-nonce-store.js, EXPIRE_IN_SEC = 5*60),
-  // way stricter than the old 24hr window. found this from writing a test for
-  // this file, not something i expected. need to talk to ben/team about
-  // whether 5 min is fine for us or if we need a custom nonce store with a
-  // longer window to match old behavior
-  const timestamp = Number(params["oauth_timestamp"]);
-  const ageMinutes = (Date.now() / 1000 - timestamp) / 60;
-  if (!timestamp || ageMinutes > 1440) {
-    return { valid: false, message: "request is too old" };
-  }
+  // old rails code checked for requests older than 1440 min (24 hrs) here,
+  // but that was basically dead code anyway - ims-lti's nonce store already
+  // rejects anything older than 5 min on its own (lib/memory-nonce-store.js,
+  // EXPIRE_IN_SEC = 5*60) with actual nonce tracking, unlike the old check
+  // which was just a timestamp window with no real replay protection behind
+  // it (the old nonce check was never implemented). keeping ims-lti's
+  // stricter default instead of trying to match the old window, no real
+  // reason to loosen it without evidence it actually causes problems
 
   return { valid: true };
 }
