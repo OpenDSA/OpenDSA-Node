@@ -6,7 +6,7 @@
 // table for this, probably needs its own table
 
 // ims-lti already does nonce checking for us (in memory), the old rails code
-// never actually finished that part so this is already better lol
+// never actually finished that part so this is already better
 
 import { Request } from "express";
 import { Provider } from "ims-lti";
@@ -37,10 +37,13 @@ export async function validateLtiLaunch(req: Request): Promise<LtiLaunchValidati
 
   const provider = new Provider(consumerKey, secret);
 
-  // old code had a separate canvas specific check here using
-  // IMS::LTI::MessageAuthenticator, vs a generic one for anything else.
-  // not sure yet if ims-lti needs that same split or if valid_request handles
-  // it already. since we're only dealing with canvas rn it might not matter
+  // old rails code had a separate canvas specific signature check here.
+  // looked at ims-lti's source (lib/hmac-sha1.js) and it already checks
+  // tool_consumer_info_product_family_code === 'canvas' internally and handles
+  // the url differently for that case, so probably dont need a separate path
+  // like the old code did. ran a local test confirming valid_request works for
+  // a signed request + rejects a tampered one, just didnt test the canvas
+  // specific branch directly yet
 
   const isValid = await new Promise<boolean>((resolve, reject) => {
     provider.valid_request(req, params, (err: Error | null, valid: boolean) => {
