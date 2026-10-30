@@ -1,5 +1,20 @@
 import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+
+import Home from "./pages/Home";
 import CreateCourse from "./pages/CreateCourse";
+import CreateBook from "./pages/CreateBook";
+import BrowseCourses from "./pages/BrowseCourses";
+import InstructorGuides from "./pages/InstructorGuides";
+import SystemDocumentation from "./pages/SystemDocumentation";
+import NotFound from "./pages/NotFound";
+import About from "./pages/About";
+import Official from "./pages/Official";
+import Contact from "./pages/Contact";
+
 
 function App() {
   const [status, setStatus] = useState("checking...");
@@ -12,12 +27,32 @@ function App() {
   }, []);
 
   return (
-    <div>
-      <h1>OpenDSA</h1>
-      <p>Backend status: {status}</p>
+    <BrowserRouter>
+      <Navbar />
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/courses" element={<BrowseCourses />} />
+          <Route path="/courses/new" element={<CreateCourse />} />
+          <Route path="/books/new" element={<CreateBook />} />
+          <Route path="/guides" element={<InstructorGuides />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/official" element={<Official />} />
+          <Route path="/contact" element={<Contact />} />
 
-      <CreateCourse />
-    </div>
+          <Route
+            path="/documentation"
+            element={<SystemDocumentation />}
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+
+      <Footer />
+      {import.meta.env.DEV && (
+        <p>Backend status: {status}</p>
+      )}
+    </BrowserRouter>
   );
 }
 

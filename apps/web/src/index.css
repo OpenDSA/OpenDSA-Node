@@ -1,0 +1,151 @@
+/* Main website styling */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f7eddc;
+  color: #333;
+}
+
+/* Navigation bar */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #3e3029;
+  padding: 0 20px;
+  min-height: 60px;
+}
+
+.navbar-left,
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.navbar a,
+.navbar button {
+  color: white;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.navbar-logo {
+  color: #36a4bb !important;
+  font-size: 25px !important;
+  font-weight: bold;
+}
+
+.navbar a:hover,
+.navbar button:hover {
+  color: #36a4bb;
+}
+
+/* Course dropdown */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 20px 0;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  background: white;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.dropdown:hover .dropdown-menu,
+.dropdown:focus-within .dropdown-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-menu a {
+  color: #36a4bb;
+  padding: 12px 15px;
+}
+
+.dropdown-menu a:hover {
+  background-color: #f5f5f5;
+}
+
+/* Main page */
+main {
+  padding: 20px;
+  min-height: calc(100vh - 120px);
+}
+
+h1 {
+  color: #269db5;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+}
+
+.primary-button {
+  display: inline-block;
+  background-color: #f9a126;
+  color: white;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.primary-button:hover {
+  background-color: #e38b10;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  background-color: #3e3029;
+  padding: 15px 30px;
+}
+
+.footer a,
+.footer span {
+  color: white;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: #36a4bb;
+}
+
+/* a mobile layout just in case */
+@media (max-width: 800px) {
+  .navbar {
+    flex-wrap: wrap;
+    padding: 15px;
+  }
+
+  .navbar-left,
+  .navbar-right {
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  main {
+    padding: 15px;
+  }
+}
