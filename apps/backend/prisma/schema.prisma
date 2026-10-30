@@ -938,3 +938,35 @@ model Users {
   @@index([time_zone_id], map: "index_users_on_time_zone_id")
   @@map("users")
 }
+
+// LTIjs authentication information for the database wrapper
+
+// Validated LTI 1.3 launch id_token claims, keyed by the id embedded in the `ltik`.
+model LtiIdTokens {
+  id              String   @id @db.VarChar(36)
+  lms_instance_id Int?
+  claims          Json
+  created_at      DateTime @default(now())
+
+  @@index([lms_instance_id])
+  @@map("lti_id_tokens")
+}
+
+model LtiAccessTokens {
+  cache_key  String   @id @db.VarChar(64)
+  token      Json
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("lti_access_tokens")
+}
+
+model LtiNonces {
+  nonce      String   @id @db.VarChar(64)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("lti_nonces")
+}

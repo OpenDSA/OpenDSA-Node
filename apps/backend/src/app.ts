@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import { apiRouter } from "./routes";
+import { lti13Router } from "./lti/provider";
 
 export const app = express();
 
@@ -9,6 +10,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // API routes
 app.use("/api", apiRouter);
+
+// LTI 1.3 (ltijs): /lti13/login_initiations, /lti13/launches, /lti13/keys, /api/lti/session
+app.use(lti13Router);
 
 
 // Basic universal error handler middleware
