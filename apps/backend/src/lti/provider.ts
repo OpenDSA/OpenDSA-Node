@@ -6,6 +6,15 @@ import { PrismaDatabaseManager } from "./prisma_database_manager";
 /** Express router holding ltijs's /lti13/* routes plus the minimal test routes. Mount on the app. */
 export const lti13Router = Router();
 
+// Log all incoming LTI requests to debug params from Canvas
+lti13Router.use((req, _res, next) => {
+  console.log(`[LTI13 Incoming] ${req.method} ${req.originalUrl}`, {
+    query: req.query,
+    body: req.body,
+  });
+  next();
+});
+
 export const ltiProvider = new Provider({
   databaseManager: new PrismaDatabaseManager(),
   httpHandler: new RouterHttpHandler(lti13Router),
@@ -14,6 +23,21 @@ export const ltiProvider = new Provider({
     launchRoute: "/lti13/launches",
     keysetRoute: "/lti13/keys",
   },
+});
+
+ltiProvider.onUnregisteredPlatform(async (request, response) => {
+  console.error("[ltijs] UnregisteredPlatform detected! Incoming request details:", {
+    query: request.query,
+    body: request.body,
+  });
+  response.status(400).json({
+    error: "UnregisteredPlatformError",
+    message: "UNREGISTERED_PLATFORM",
+    received: {
+      query: request.query,
+      body: request.body,
+    },
+  });
 });
 
 // Minimal launch handler: prove the whole OIDC -> JWT validation -> DB round trip works.
