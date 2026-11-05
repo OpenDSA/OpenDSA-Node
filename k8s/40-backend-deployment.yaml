@@ -32,6 +32,21 @@ spec:
           env:
             - name: PORT
               value: "3000"
+            - name: NODE_ENV
+              value: production
+            # Direct ingress -> backend path; ingress must overwrite forwarded headers.
+            - name: TRUST_PROXY_HOPS
+              value: "1"
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: SESSION_SECRET
+            - name: PASSWORD_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: PASSWORD_PEPPER
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

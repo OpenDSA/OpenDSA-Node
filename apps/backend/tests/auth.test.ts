@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { app } from "../src/app";
 import { prisma } from "../src/db";
 import { signInForTest } from "./auth-client";
+import { hashPassword } from "../src/auth/passwords";
 
 test("login sessions, CSRF, role restrictions, user identity and logout", async () => {
   const server = app.listen(0, "127.0.0.1");
@@ -23,7 +24,7 @@ test("login sessions, CSRF, role restrictions, user identity and logout", async 
     assert.equal(badLogin.status, 401);
     assert.deepEqual(await badLogin.json(), { error: "Invalid email or password." });
     const originalLookup = prisma.users.findUnique;
-    const testHash = await (await import("bcryptjs")).hash("Right-test-password", 4);
+    const testHash = await hashPassword("Right-test-password");
     prisma.users.findUnique = (async (args: any) => {
       const found = await originalLookup.call(prisma.users, args);
       return found && args.select?.encrypted_password ? { ...found, encrypted_password: testHash } : found;
@@ -49,11 +50,16 @@ test("login sessions, CSRF, role restrictions, user identity and logout", async 
     const student = await signInForTest(base, "seed-alice@example.com");
     assert.equal((await fetch(`${base}/api/course-offerings`, { method: "POST", headers: student })).status, 403);
     assert.equal((await fetch(`${base}/api/course-offerings/11/generate`, { method: "POST", headers: student })).status, 403);
-    assert.equal((await fetch(`${base}/api/auth/logout`, { method: "POST", headers })).status, 204);
-    assert.deepEqual(await (await fetch(`${base}/api/auth/me`, { headers })).json(), { user: null });
-    assert.equal((await fetch(`${base}/api/course-offerings`, { method: "POST", headers })).status, 401);
-    assert.equal((await fetch(`${base}/api/auth/me`, { headers: { Cookie: `${headers.Cookie}tampered` } })).status, 200);
-    assert.deepEqual(await (await fetch(`${base}/api/auth/me`, { headers: { Cookie: `${headers.Cookie}tampered` } })).json(), { user: null });
+    const logout = await fetch(`${base}/api/auth/logout`, { method: "POST", headers });
+    assert.equal(logout.status, 204);
+    const loggedOutHeaders = { Cookie: logout.headers.get("set-cookie")!.split(";")[0] };
+    assert.deepEqual(await (await fetch(`${base}/api/auth/me`, { headers: loggedOutHeaders })).json(), { user: null });
+    assert.equal((await fetch(`${base}/api/course-offerings`, { method: "POST", headers: loggedOutHeaders })).status, 401);
+    // Stateless logout clears the browser cookie; a copied cookie lasts until expiry.
+    assert.equal((await (await fetch(`${base}/api/auth/me`, { headers })).json()).user.id, user.id);
+    const middle = Math.floor(headers.Cookie.length / 2);
+    const tampered = headers.Cookie.slice(0, middle) + (headers.Cookie[middle] === "a" ? "b" : "a") + headers.Cookie.slice(middle + 1);
+    assert.deepEqual(await (await fetch(`${base}/api/auth/me`, { headers: { Cookie: tampered } })).json(), { user: null });
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     await prisma.$disconnect();
