@@ -48,7 +48,7 @@ function App() {
           <Route path="/official" element={<Official />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/license" element={<License />} />
-          <Route path="/textbooks/new" element={<CreateTextbook />} />
+          <Route path="/textbooks/new" element={<RequireAuth instructor><CreateTextbook /></RequireAuth>} />
 
           <Route
             path="/documentation"
