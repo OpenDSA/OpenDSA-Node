@@ -17,6 +17,8 @@ import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import Official from "./pages/Official";
 import Contact from "./pages/Contact";
+import License from "./pages/License";
+import CreateTextbook from "./pages/CreateTextbook";
 
 
 function App() {
@@ -45,6 +47,8 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/official" element={<Official />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/license" element={<License />} />
+          <Route path="/textbooks/new" element={<CreateTextbook />} />
 
           <Route
             path="/documentation"
