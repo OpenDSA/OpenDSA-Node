@@ -118,12 +118,9 @@ export function courseOfferingError(error: unknown): { status: number; error: st
 }
 
 export async function getGenerationContext(lmsInstanceId: number, userId: number) {
-  if (![undefined, "development", "test"].includes(process.env.NODE_ENV)) {
-    throw new CourseOfferingError(503, "Content-only generation is development-only.");
-  }
   const user = await prisma.users.findUnique({ where: { id: userId } });
   if (!user) throw new CourseOfferingError(401, "Sign in required.");
-  // Local content-generation tests deliberately omit LTI registration/launches.
+  // Content generation omits LTI registration/launches.
   const settings = {
     launchUrl: "", resourceSelectionUrl: "", extrtoolLaunchBaseUrl: "",
     canvasContentOnly: true,
@@ -149,7 +146,7 @@ export async function generateBook(instBookId: number, context: Awaited<ReturnTy
   if (running.has(instBookId)) throw new CourseOfferingError(409, "Generation is already running for this book.");
   running.add(instBookId);
   try {
-    // Fail before making any Canvas writes when the local compiler is offline.
+    // Fail before making any Canvas writes when the compiler is offline.
     const health = await fetch(new URL("/", context.configApiLink), { signal: AbortSignal.timeout(10000) });
     if (!health.ok) throw new CourseOfferingError(503, "OpenDSA compiler is not available.");
     return await generateCourse({ ...context, instBookId });

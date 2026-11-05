@@ -191,7 +191,10 @@ and backend images, verify HTTPS login/logout, cookie attributes, and that login
 survives a backend restart. A plain HTTP port-forward cannot test production
 login without an appropriate local HTTPS proxy. Clearing the browser cookie logs
 that browser out; a copied stateless cookie remains valid until expiry.
-Course generation's separate development-only restriction is unchanged.
+Signed-in instructors can generate book content in production using their stored
+Canvas token. `BOOKS_PUBLIC_URL` points generated links at Discovery's `/Books`
+route. This creates ordinary book links; LTI launches remain a separate integration.
+Compiled book files still need persistent storage to survive backend Pod replacement.
 
 ## Updating after a new image push
 

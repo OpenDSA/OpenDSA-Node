@@ -26,7 +26,7 @@ spec:
           emptyDir: {}
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:auth-b7f9419
           ports:
             - containerPort: 3000
           env:
@@ -61,6 +61,8 @@ spec:
               value: /mnt/opendsa-shared
             - name: CONFIG_API_LINK
               value: http://localhost:8080/api/configure/
+            - name: BOOKS_PUBLIC_URL
+              value: https://91762f26-opendsanode.discovery.cs.vt.edu/Books
           volumeMounts:
             - name: opendsa-shared
               mountPath: /mnt/opendsa-shared

@@ -4,16 +4,29 @@ import { prisma } from "../src/db";
 import { cloneBook } from "../src/services/clone-book";
 import { getGenerationContext } from "../src/services/course-offerings";
 
-test("development-only content generation remains disabled in production", async () => {
+test("production content generation accepts a user and token, and rejects missing credentials", async () => {
   const nodeEnv = process.env.NODE_ENV;
-  const enabled = process.env.LOCAL_COURSE_GENERATION;
+  const publicUrl = process.env.BOOKS_PUBLIC_URL;
+  const userLookup = prisma.users.findUnique;
+  const accessLookup = prisma.lmsAccesses.findUnique;
   try {
     process.env.NODE_ENV = "production";
-    process.env.LOCAL_COURSE_GENERATION = "true";
-    await assert.rejects(getGenerationContext(1, 6), /development-only/);
+    process.env.BOOKS_PUBLIC_URL = "https://books.test.invalid/Books";
+    prisma.users.findUnique = (async () => ({ id: 6 })) as any;
+    prisma.lmsAccesses.findUnique = (async () => ({ access_token: "test-token" })) as any;
+    const context = await getGenerationContext(1, 6);
+    assert.equal(context.userId, 6);
+    assert.equal(context.canvasContentOnly, true);
+    assert.equal(context.bookPublicBaseUrl, process.env.BOOKS_PUBLIC_URL);
+    prisma.lmsAccesses.findUnique = (async () => null) as any;
+    await assert.rejects(getGenerationContext(1, 6), /Canvas API token/);
+    prisma.users.findUnique = (async () => null) as any;
+    await assert.rejects(getGenerationContext(1, 6), /Sign in required/);
   } finally {
+    prisma.users.findUnique = userLookup;
+    prisma.lmsAccesses.findUnique = accessLookup;
     if (nodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = nodeEnv;
-    if (enabled === undefined) delete process.env.LOCAL_COURSE_GENERATION; else process.env.LOCAL_COURSE_GENERATION = enabled;
+    if (publicUrl === undefined) delete process.env.BOOKS_PUBLIC_URL; else process.env.BOOKS_PUBLIC_URL = publicUrl;
   }
 });
 
