@@ -159,6 +159,43 @@ kubectl get ns 91762f26-opendsanode
     # confirm /api/health/db still works after, data still there
     ```
 
+## Password authentication
+
+The backend now supports password authentication with `NODE_ENV=production`.
+Before deploying the updated backend, copy `12-auth-secret.example.yaml` to
+`12-auth-secret.yaml` (gitignored). Fill in a randomly generated `SESSION_SECRET`
+of at least 32 characters (`openssl rand -hex 32`) and the `PASSWORD_PEPPER` used
+to create passwords in the target database, then apply it:
+
+```sh
+kubectl apply -f k8s/12-auth-secret.yaml
+```
+
+`40-backend-deployment.yaml` reads both values from `opendsa-auth`. Do not apply
+the placeholder example directly. The local `.env` is not uploaded. Keep the
+session secret stable and identical across backend replicas; replacing it signs
+everyone out. Changing the pepper requires resetting affected passwords. Any
+password-seeding process must receive the same pepper; this Secret is not
+automatically attached to separate Jobs. The demo seed's production guard remains.
+
+The backend trusts one proxy hop (`TRUST_PROXY_HOPS=1`) for the direct
+Nginx ingress -> backend Service path. The ingress must overwrite client-supplied
+forwarded headers, and the backend must not be directly exposed through another
+public path. Recheck the hop count if routing changes; Express uses it for HTTPS
+detection and login rate limiting. Local direct HTTP uses zero trusted hops.
+
+Production auth routes require HTTPS as reported by the trusted ingress, and
+cookies use Secure, HttpOnly, SameSite=Lax, and an eight-hour login lifetime.
+Health probes remain available over internal HTTP. After deploying matching web
+and backend images, verify HTTPS login/logout, cookie attributes, and that login
+survives a backend restart. A plain HTTP port-forward cannot test production
+login without an appropriate local HTTPS proxy. Clearing the browser cookie logs
+that browser out; a copied stateless cookie remains valid until expiry.
+Signed-in instructors can generate book content in production using their stored
+Canvas token. `BOOKS_PUBLIC_URL` points generated links at Discovery's `/Books`
+route. This creates ordinary book links; LTI launches remain a separate integration.
+Compiled book files still need persistent storage to survive backend Pod replacement.
+
 ## Updating after a new image push
 
 Either bump `:__TAG__` in the Deployment and `kubectl apply`, or do it the

@@ -6,6 +6,8 @@ import type { BookCompileInput as CompileInput } from "./contract";
 // ============================================================================
 
 export interface GenerateCourseInput {
+  canvasContentOnly?: boolean;
+  bookPublicBaseUrl?: string;
   instBookId: number;
   launchUrl: string;
   resourceSelectionUrl: string;

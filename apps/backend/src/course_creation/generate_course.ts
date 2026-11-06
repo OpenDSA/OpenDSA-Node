@@ -93,7 +93,7 @@ async function generateCourseUnlocked(
 
   const { consumer_key: consumerKey, consumer_secret: consumerSecret } =
     userLmsAccess;
-  if (!consumerKey || !consumerSecret) {
+  if (!input.canvasContentOnly && (!consumerKey || !consumerSecret)) {
     throw new Error(
       `LmsAccess for user_id=${user.id}, lms_instance_id=${lmsInstance.id} is missing consumer_key/consumer_secret`
     );
@@ -125,21 +125,23 @@ async function generateCourseUnlocked(
     },
   });
 
-  await ensureCanvasLtiTool(canvasClient, {
+  if (!input.canvasContentOnly) await ensureCanvasLtiTool(canvasClient, {
     lmsCourseId,
     instBookId: instBook.id,
     courseOfferingId: courseOffering.id,
     launchUrl: input.launchUrl,
     resourceSelectionUrl: input.resourceSelectionUrl,
     clientId: lmsInstance.client_id,
-    consumerKey,
-    consumerSecret,
+    consumerKey: consumerKey!,
+    consumerSecret: consumerSecret!,
   });
 
   await syncCanvasChapters(canvasClient, {
     lmsCourseId,
     instBookId: instBook.id,
     chapters: instBook.inst_chapters,
+    canvasContentOnly: input.canvasContentOnly,
+    bookPublicBaseUrl: input.bookPublicBaseUrl,
     buildPath,
     launchUrl: input.launchUrl,
     isZeroPt,

@@ -1,12 +1,20 @@
 import express, { Request, Response, NextFunction } from "express";
+import { authSession, initializePassport, restoreUser } from "./auth";
 import { apiRouter } from "./routes";
 import { lti13Router } from "./lti/provider";
+import { trustProxyHops } from "./auth/sessions";
 
 export const app = express();
+// Only enable when the last trusted proxy overwrites forwarded headers.
+app.set("trust proxy", trustProxyHops);
 
 // Express and core library setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(authSession);
+app.use(initializePassport);
+app.use(restoreUser);
 
 // API routes
 app.use("/api", apiRouter);

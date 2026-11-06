@@ -1,3 +1,5 @@
+import { requireAuthentication, requireCsrf, canManageOffering } from "../auth";
+import { prisma } from "../db";
 import { Request, Response, Router } from "express";
 import { BookCompileError } from "./compile_book";
 import { getCompileConfig } from "./config";
@@ -7,7 +9,7 @@ import type { GenerateCourseInput } from "./types";
 export const generateCourseRouter = Router();
 
 generateCourseRouter.post(
-  "/inst_books/:id/generate_course",
+  "/inst_books/:id/generate_course", requireAuthentication, requireCsrf,
   async (req: Request, res: Response) => {
     try {
       const instBookId = Number(req.params.id);
@@ -15,7 +17,6 @@ generateCourseRouter.post(
         launchUrl,
         resourceSelectionUrl,
         extrtoolLaunchBaseUrl,
-        userId,
       } = req.body as Partial<GenerateCourseInput>;
 
       if (
@@ -23,22 +24,30 @@ generateCourseRouter.post(
         !launchUrl ||
         !resourceSelectionUrl ||
         !extrtoolLaunchBaseUrl ||
-        typeof userId !== "number"
+        !Number.isInteger(instBookId) || instBookId <= 0 || instBookId > 2147483647
       ) {
         res.status(400).json({
           error:
-            "Missing required parameters: instBookId, launchUrl, resourceSelectionUrl, extrtoolLaunchBaseUrl, userId",
+            "Missing required parameters: instBookId, launchUrl, resourceSelectionUrl, extrtoolLaunchBaseUrl",
         });
         return;
       }
 
       const config = getCompileConfig();
+      if ("userId" in req.body) {
+        res.status(400).json({ error: "User identity comes from your session." }); return;
+      }
+      const book = await prisma.instBooks.findUnique({ where: { id: instBookId }, select: { course_offering_id: true } });
+      if (!book) { res.status(404).json({ error: "Book not found." }); return; }
+      if (!book.course_offering_id || !await canManageOffering(req.user!, book.course_offering_id)) {
+        res.status(403).json({ error: "You cannot generate this book." }); return;
+      }
       const result = await generateCourse({
         instBookId,
+        userId: req.user!.id,
         launchUrl,
         resourceSelectionUrl,
         extrtoolLaunchBaseUrl,
-        userId,
         openDsaSharedDir: config.openDsaSharedDir,
         configApiLink: config.configApiLink,
         timeoutMs: config.timeoutMs,

@@ -26,12 +26,27 @@ spec:
           emptyDir: {}
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:textbook-25929ab
           ports:
             - containerPort: 3000
           env:
             - name: PORT
               value: "3000"
+            - name: NODE_ENV
+              value: production
+            # Direct ingress -> backend path; ingress must overwrite forwarded headers.
+            - name: TRUST_PROXY_HOPS
+              value: "1"
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: SESSION_SECRET
+            - name: PASSWORD_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: PASSWORD_PEPPER
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -46,6 +61,8 @@ spec:
               value: /mnt/opendsa-shared
             - name: CONFIG_API_LINK
               value: http://localhost:8080/api/configure/
+            - name: BOOKS_PUBLIC_URL
+              value: https://91762f26-opendsanode.discovery.cs.vt.edu/Books
           volumeMounts:
             - name: opendsa-shared
               mountPath: /mnt/opendsa-shared
