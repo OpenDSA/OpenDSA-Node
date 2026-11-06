@@ -28,7 +28,8 @@ body {
 }
 
 .navbar a,
-.navbar button {
+.navbar button
+.navbar-right span {
   color: white;
   text-decoration: none;
   font-size: 15px;
@@ -53,8 +54,17 @@ body {
 .dropdown-button {
   background: none;
   border: none;
+  color: white;
+  font-size: 15px;
   cursor: pointer;
   padding: 20px 0;
+}
+
+.navbar-right button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 0;
 }
 
 .dropdown-menu {
@@ -301,4 +311,42 @@ button {
   .textbook-submit {
     margin-left: 0;
   }
+}
+
+.navbar .admin-link {
+  font-size: 22px;
+}
+
+/* Administrator Dashboard Styling */
+
+.admin-dashboard {
+  padding: 20px;
+}
+
+.admin-dashboard h2 {
+  margin-top: 30px;
+  margin-bottom: 15px;
+}
+
+.admin-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+  background-color: #f5f5f5;
+}
+
+.admin-dashboard th,
+.admin-dashboard td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.admin-dashboard th {
+  background-color: #e5e5e5;
+  font-weight: bold;
+}
+
+.admin-dashboard tr:nth-child(even) {
+  background-color: #eeeeee;
 }

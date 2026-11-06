@@ -19,6 +19,7 @@ import Official from "./pages/Official";
 import Contact from "./pages/Contact";
 import License from "./pages/License";
 import CreateTextbook from "./pages/CreateTextbook";
+import AdminDashboard from "./pages/AdminDashboard";
 
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/license" element={<License />} />
           <Route path="/textbooks/new" element={<RequireAuth instructor><CreateTextbook /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
 
           <Route
             path="/documentation"
