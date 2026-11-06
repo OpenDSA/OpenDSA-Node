@@ -58,7 +58,15 @@ function Navbar() {
         </div>
 
         <div className="navbar-right">
-            <span aria-label="Admin Settings" title="Admin Settings">⚙</span>
+          {user && (
+            <Link 
+              to="/admin" 
+              className="admin-link"
+              aria-label="Administrator Dashboard" 
+              title="Administrator Dashboard">
+            🔧
+            </Link>
+          )}
             {user ? <><span>{user.first_name || user.email}</span><button type="button" onClick={signOut}>Sign out</button></>
               : <Link to="/login">Sign in</Link>}
             {error && <span role="alert">{error}</span>}
