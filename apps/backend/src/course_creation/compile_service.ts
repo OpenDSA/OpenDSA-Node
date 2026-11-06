@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { BookConfigJson, OpenDsaCompileResponse } from "./types";
+import type { BookCompileInput } from "./contract";
+import type { OpenDsaCompileResponse } from "./types";
 import { sanitizeFilename } from "./utils";
 
 // ============================================================================
@@ -11,7 +12,7 @@ export interface WriteBookConfigFileParams {
   userId: number;
   compiledAt: Date;
   openDsaSharedDir: string;
-  bookConfig: BookConfigJson;
+  bookConfig: BookCompileInput;
 }
 
 export interface WrittenConfigFile {
@@ -39,6 +40,7 @@ export async function triggerOpenDsaCompile(
     configPath: string;
     buildPath: string;
     rake: boolean;
+    timeoutMs?: number;
   }
 ): Promise<OpenDsaCompileResponse> {
   const formBody = new URLSearchParams({
@@ -47,13 +49,32 @@ export async function triggerOpenDsaCompile(
     rake: String(params.rake),
   });
 
-  const response = await fetch(configApiLink, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: formBody.toString(),
-  });
+  const signal =
+    params.timeoutMs && params.timeoutMs > 0
+      ? AbortSignal.timeout(params.timeoutMs)
+      : undefined;
+
+  let response: Response;
+  try {
+    response = await fetch(configApiLink, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formBody.toString(),
+      signal,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      throw new Error(
+        `OpenDSA compilation timed out after ${params.timeoutMs} ms.`
+      );
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");

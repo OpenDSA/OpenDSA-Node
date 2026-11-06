@@ -1,13 +1,10 @@
 import { prisma } from "../db";
 import { CanvasClient } from "./canvas_client";
 import { ensureCanvasLtiTool, syncCanvasChapters } from "./canvas_sync";
-import { triggerOpenDsaCompile, writeBookConfigFile } from "./compile_service";
-import { serializeBookConfig } from "./serialize_book_config";
-import {
-  GenerateCourseInput,
-  GenerateCourseOutput,
-  instBookFullInclude,
-} from "./types";
+import { acquireBookCompileLock, BookCompileError, runCompile } from "./compile_book";
+import { instBookFullInclude } from "./types";
+import type { GenerateCourseInput, GenerateCourseOutput } from "./types";
+import { validateBookForCompile } from "./validate_book";
 import { buildBookOutputPath, parseJsonObject } from "./utils";
 
 // ============================================================================
@@ -15,10 +12,20 @@ import { buildBookOutputPath, parseJsonObject } from "./utils";
 // ============================================================================
 
 /**
- * Generates the Canvas LMS course structure (LTI tool, modules, assignment groups,
- * assignments, and module items) and triggers the OpenDSA book compilation service.
+ * Generates the Canvas LMS course structure (LTI tool, modules, assignment
+ * groups, assignments, and module items) and compiles the OpenDSA book.
+ *
+ * The per-book lock covers Canvas sync and compilation so two requests cannot
+ * write the same compiler output directory or Canvas structure concurrently.
  */
-export async function generateCourse(
+export function generateCourse(
+  input: GenerateCourseInput
+): Promise<GenerateCourseOutput> {
+  const release = acquireBookCompileLock(input.instBookId);
+  return generateCourseUnlocked(input).finally(release);
+}
+
+async function generateCourseUnlocked(
   input: GenerateCourseInput
 ): Promise<GenerateCourseOutput> {
   const openDsaSharedDir = input.openDsaSharedDir;
@@ -31,12 +38,32 @@ export async function generateCourse(
   });
 
   if (!instBook) {
-    throw new Error(`InstBook with id=${input.instBookId} not found`);
+    throw new BookCompileError(
+      "NOT_FOUND",
+      404,
+      `InstBook with id=${input.instBookId} not found.`
+    );
   }
   if (!instBook.course_offering) {
-    throw new Error(
-      `InstBook id=${input.instBookId} is not linked to a CourseOffering`
+    throw new BookCompileError(
+      "NOT_COMPILABLE",
+      400,
+      `InstBook id=${input.instBookId} is not linked to a CourseOffering.`
     );
+  }
+
+  const validation = validateBookForCompile(instBook, {
+    extrtoolLaunchBaseUrl: input.extrtoolLaunchBaseUrl,
+  });
+  if (validation.errors.length > 0) {
+    throw new BookCompileError(
+      "NOT_COMPILABLE",
+      400,
+      `InstBook id=${input.instBookId} cannot be compiled:\n${validation.errors.join("\n")}`
+    );
+  }
+  for (const warning of validation.warnings) {
+    console.warn(`[inst_book ${input.instBookId}] ${warning}`);
   }
 
   const courseOffering = instBook.course_offering;
@@ -118,46 +145,22 @@ export async function generateCourse(
     isZeroPt,
   });
 
-  const compiledAt = new Date();
-  instBook.last_compiled = compiledAt;
-  await prisma.instBooks.update({
-    where: { id: instBook.id },
-    data: {
-      last_compiled: compiledAt,
-      updated_at: compiledAt,
-    },
-  });
-
-  // 3. Serialize book configuration JSON
-  const bookConfig = serializeBookConfig(
-    instBook,
-    parsedBookOptions,
-    input.extrtoolLaunchBaseUrl
-  );
-
-  // 4. Write configuration to shared volume
-  const { configPath, configFilePath } = await writeBookConfigFile({
+  const compileResult = await runCompile(instBook, {
     userId: user.id,
-    compiledAt,
+    extrtoolLaunchBaseUrl: input.extrtoolLaunchBaseUrl,
     openDsaSharedDir,
-    bookConfig,
-  });
-
-  // 5. Invoke OpenDSA compiler service
-  const compileResponse = await triggerOpenDsaCompile(configApiLink, {
-    configPath,
-    buildPath,
-    rake: false,
+    configApiLink,
+    timeoutMs: input.timeoutMs,
   });
 
   return {
     instBookId: instBook.id,
     lmsCourseId,
     lmsCourseCode: canvasCourse.course_code,
-    configFilePath,
-    configPath,
-    buildPath,
-    bookConfig,
-    compileResponse,
+    configFilePath: compileResult.configFilePath,
+    configPath: compileResult.configPath,
+    buildPath: compileResult.buildPath,
+    bookConfig: compileResult.bookConfig,
+    compileResponse: compileResult.compileResponse,
   };
 }
