@@ -11,10 +11,13 @@
 import { Request } from "express";
 import { Provider } from "ims-lti";
 import { prisma } from "../db";
+import { LtiLaunchContext } from "./types";
 
 export interface LtiLaunchValidationResult {
   valid: boolean;
   message?: string;
+  // only set when valid is true
+  context?: LtiLaunchContext;
 }
 
 // port of get_oauth_creds from lti_controller.rb line 868. checks LmsInstance
@@ -86,7 +89,36 @@ export async function validateLtiLaunch(
   // stricter default instead of trying to match the old window, no real
   // reason to loosen it without evidence it actually causes problems
 
-  return { valid: true };
+  // provider.body/.instructor/.student get set by parse_request(), which
+  // valid_request() already called internally, so these are ready to use
+  const body = provider.body;
+  const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || "";
+
+  // old code: uri = URI.parse(request.referrer); url = uri.scheme + '://' + uri.host
+  let lmsInstanceUrl = "";
+  const referer = req.get("Referer");
+  if (referer) {
+    try {
+      const u = new URL(referer);
+      lmsInstanceUrl = `${u.protocol}//${u.host}`;
+    } catch {
+      // leave blank, ensureLmsInstance will fail loudly on an empty url
+    }
+  }
+
+  const context: LtiLaunchContext = {
+    email: str(body["lis_person_contact_email_primary"]) || str(body["custom_contact_email_primary"]),
+    rawUserId: str(body["user_id"]) || null,
+    firstName: str(body["lis_person_name_given"]) || null,
+    lastName: str(body["lis_person_name_family"]) || null,
+    isInstructor: provider.instructor,
+    lmsInstanceUrl,
+    lmsTypeName: str(body["tool_consumer_info_product_family_code"]) || "other",
+    customInstBookId: str(body["custom_inst_book_id"]) ? Number(body["custom_inst_book_id"]) : null,
+    customCourseOfferingId: str(body["custom_course_offering_id"]) ? Number(body["custom_course_offering_id"]) : null,
+  };
+
+  return { valid: true, context };
 }
 
 // todo: everything after lti_authorize! passes in the old code -

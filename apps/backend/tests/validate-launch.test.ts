@@ -31,7 +31,12 @@ function buildSignedBody(overrides: Record<string, string> = {}) {
     method: "POST",
     protocol: "https",
     connection: { encrypted: true },
-    headers: { host: "example.com" },
+    headers: { host: "example.com", referer: "https://canvas.example.edu/courses/123" },
+    // real Request has this as a method (reads from headers) - validateLtiLaunch
+    // calls req.get("Referer") to figure out the lms instance url
+    get(name: string) {
+      return this.headers[name.toLowerCase()];
+    },
   } as unknown as Request;
 
   const signer = new (HMAC_SHA1 as any)();

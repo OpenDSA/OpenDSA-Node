@@ -9,6 +9,12 @@ declare module "ims-lti" {
       body: unknown,
       callback: (err: Error | null, valid: boolean) => void
     ): void;
+    // set by parse_request(), which valid_request() calls internally - so
+    // these are populated by the time the valid_request callback fires
+    body: Record<string, string | string[] | undefined>;
+    instructor: boolean;
+    student: boolean;
+    admin: boolean;
   }
 }
 
