@@ -47,6 +47,27 @@ one Discovery has.
   separate opendsa sidecars with their own compiled-book cache, so content
   compiled on one pod wouldn't show up on the other. Fine for now.
 
+### Compiled book persistence (`opendsa-books` PVC)
+
+Compiled output (`/opendsa/Books`) is a separate `ceph-rbd` PVC (`35-opendsa-books-pvc.yaml`),
+mounted only in the `opendsa` container with no `subPath` - nothing else lives at
+that path in the image, so mounting the whole volume there is safe. It's
+`ReadWriteOnce` like everything else on Discovery, which is fine since only
+this one Pod ever mounts it.
+
+This is also why `40-backend-deployment.yaml` sets `strategy: type: Recreate`
+on the Deployment instead of the Kubernetes default `RollingUpdate`. RWO means
+only one Pod can hold the volume at a time - `RollingUpdate` tries to start the
+new Pod before killing the old one, which fails to attach the still-held
+volume (multi-attach error, stuck rollout). `Recreate` fully terminates the old
+Pod first, trading a few seconds of downtime on deploy for a rollout that
+actually completes.
+
+The StorageClass's `reclaimPolicy` is `Delete` (confirmed, same as the MySQL
+PVC) - deleting this PVC deletes the compiled books permanently, no retain or
+recovery. Treat it like the database: not something to delete casually once it
+holds real content.
+
 One extra wrinkle: the `opendsa` image needed its own Dockerfile. Its source
 lives in `OpenDSA-DevStack`, and none of the Dockerfiles there (`Dockerfile`,
 `Dockerfile.server`, `Dockerfile.deforms`) actually copy the app code into
@@ -130,6 +151,10 @@ kubectl get ns 91762f26-opendsanode
      --command -- npx tsx prisma/seed.ts
    ```
 8. ```
+   kubectl apply -f k8s/35-opendsa-books-pvc.yaml
+   kubectl get pvc opendsa-books -n 91762f26-opendsanode   # expect Bound
+   ```
+9. ```
    kubectl apply -f k8s/40-backend-deployment.yaml -f k8s/41-backend-service.yaml -f k8s/42-opendsa-service.yaml
    kubectl port-forward -n 91762f26-opendsanode svc/backend 3000:3000
    curl localhost:3000/api/health
@@ -138,25 +163,29 @@ kubectl get ns 91762f26-opendsanode
    The backend Pod has 2 containers now (backend + opendsa), so
    `kubectl get pods -n 91762f26-opendsanode -l app=backend` should show
    `2/2` once both come up.
-9. ```
-   kubectl apply -f k8s/50-web-deployment.yaml -f k8s/51-web-service.yaml
-   kubectl port-forward -n 91762f26-opendsanode svc/web 8080:80
-   # browse localhost:8080, confirm the SPA loads
-   ```
 10. ```
+    kubectl apply -f k8s/50-web-deployment.yaml -f k8s/51-web-service.yaml
+    kubectl port-forward -n 91762f26-opendsanode svc/web 8080:80
+    # browse localhost:8080, confirm the SPA loads
+    ```
+11. ```
     kubectl apply -f k8s/60-ingress.yaml
     kubectl get ingress -n 91762f26-opendsanode
     # browse https://91762f26-opendsanode.discovery.cs.vt.edu/ and /api/health
     # (needs on-campus network or VPN - see ingress note below)
     ```
-11. Restart-safety checks:
+12. Restart-safety checks:
     ```
     kubectl rollout restart deployment/backend -n 91762f26-opendsanode
-    # replicas is 1 now (see opendsa sidecar notes above), so expect a
-    # short gap in /api/health during the restart - not instant anymore
+    # strategy is Recreate (see opendsa-books PVC notes above), so this
+    # fully stops the old pod before starting the new one - expect a real
+    # gap in /api/health during the restart, not a seamless rollover
 
     kubectl rollout restart deployment/mysql -n 91762f26-opendsanode
     # confirm /api/health/db still works after, data still there
+
+    # confirm compiled books survive too, not just the database:
+    kubectl exec -n 91762f26-opendsanode deploy/backend -c opendsa -- ls /opendsa/Books
     ```
 
 ## Password authentication
@@ -185,7 +214,9 @@ public path. Recheck the hop count if routing changes; Express uses it for HTTPS
 detection and login rate limiting. Local direct HTTP uses zero trusted hops.
 
 Production auth routes require HTTPS as reported by the trusted ingress, and
-cookies use Secure, HttpOnly, SameSite=Lax, and an eight-hour login lifetime.
+cookies use Secure, HttpOnly, SameSite=None (local dev stays SameSite=Lax -
+None is only needed in production so the session cookie survives Canvas's
+cross-site LTI iframe), and an eight-hour login lifetime.
 Health probes remain available over internal HTTP. After deploying matching web
 and backend images, verify HTTPS login/logout, cookie attributes, and that login
 survives a backend restart. A plain HTTP port-forward cannot test production
@@ -194,7 +225,8 @@ that browser out; a copied stateless cookie remains valid until expiry.
 Signed-in instructors can generate book content in production using their stored
 Canvas token. `BOOKS_PUBLIC_URL` points generated links at Discovery's `/Books`
 route. This creates ordinary book links; LTI launches remain a separate integration.
-Compiled book files still need persistent storage to survive backend Pod replacement.
+Compiled book files persist across Pod replacement via the `opendsa-books` PVC
+(see the PVC notes below the sidecar section).
 
 ## Updating after a new image push
 
@@ -215,6 +247,10 @@ scale it to 0 first and check logs/exec instead.
 - opendsa's resource requests/limits in `40-backend-deployment.yaml` are
   guesses - haven't actually run a real compile yet to know what it needs.
   Tune once we've tested it for real.
+- `opendsa-books` PVC size (5Gi) is also a guess, same reason - no real compile
+  yet to know actual book size on disk. `ceph-rbd` supports
+  `allowVolumeExpansion`, confirmed live, so resizing later is a simple PVC
+  patch, no migration needed.
 - Still need to double check that compiled book HTML uses relative links,
   so serving it under `/Books` (Ingress -> opendsa directly) instead of
   `/OpenDSA` through nginx like the old Rails setup actually works fine.
