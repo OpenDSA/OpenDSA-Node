@@ -26,7 +26,7 @@ spec:
           emptyDir: {}
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:textbook-25929ab
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:lti-63cc3c5
           ports:
             - containerPort: 3000
           env:
