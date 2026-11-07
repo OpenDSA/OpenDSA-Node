@@ -11,6 +11,13 @@ spec:
   # inconsistent copy of compiled book content. Revisit if that becomes a
   # real problem.
   replicas: 1
+  # ceph-rbd is ReadWriteOnce, and opendsa-books below is mounted from it - the
+  # default RollingUpdate strategy brings up the new pod before killing the old
+  # one, which means two pods trying to attach the same RWO volume at once
+  # (multi-attach error, stuck rollout). Recreate terminates the old pod fully
+  # first, so there's a few seconds of downtime on deploy instead of a hang.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend
@@ -24,6 +31,9 @@ spec:
       volumes:
         - name: opendsa-shared
           emptyDir: {}
+        - name: opendsa-books
+          persistentVolumeClaim:
+            claimName: opendsa-books
       containers:
         - name: backend
           image: container.cs.vt.edu/jaden/opendsa-node/backend:lti-63cc3c5
@@ -104,6 +114,10 @@ spec:
             - name: opendsa-shared
               mountPath: /opendsa/config/temp
               subPath: config/temp
+            # no subPath here - nothing in the opendsa image ships content at
+            # this path already, so mounting the whole pvc root is safe
+            - name: opendsa-books
+              mountPath: /opendsa/Books
           readinessProbe:
             httpGet:
               path: /
