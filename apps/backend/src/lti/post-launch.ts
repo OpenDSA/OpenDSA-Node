@@ -3,9 +3,18 @@
 // ensure_user, and lti_enroll from lti_controller.rb (lines 730, 744, 708)
 
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { LtiLaunchContext } from "./types";
 import type { LmsInstances } from "@prisma/client";
+
+// two near simultaneous launches can both pass a findUnique check and then
+// race on create - the loser hits a unique constraint error (p2002) instead
+// of the row actually existing. true if thats what just happened so the
+// caller can go re-fetch the row the winner created instead of throwing
+function isUniqueConstraintError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+}
 
 export async function ensureLmsInstance(url: string, lmsTypeName: string) {
   const existing = await prisma.lmsInstances.findFirst({ where: { url } });
@@ -65,16 +74,22 @@ export async function ensureUser(context: LtiLaunchContext, lmsInstance: LmsInst
         },
       });
 
-    user = await prisma.users.create({
-      data: {
-        email,
-        slug: makeUserSlug(email),
-        first_name: context.firstName,
-        last_name: context.lastName,
-        global_role_id: globalRole.id,
-      },
-      include: { global_role: true },
-    });
+    try {
+      user = await prisma.users.create({
+        data: {
+          email,
+          slug: makeUserSlug(email),
+          first_name: context.firstName,
+          last_name: context.lastName,
+          global_role_id: globalRole.id,
+        },
+        include: { global_role: true },
+      });
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) throw err;
+      user = await prisma.users.findUnique({ where: { email }, include: { global_role: true } });
+      if (!user) throw err;
+    }
   } else if (user.first_name !== context.firstName || user.last_name !== context.lastName) {
     user = await prisma.users.update({
       where: { id: user.id },
@@ -106,9 +121,15 @@ export async function ltiEnroll(userId: number, courseOfferingId: number, isInst
   });
 
   if (!existing) {
-    await prisma.courseEnrollments.create({
-      data: { user_id: userId, course_offering_id: courseOfferingId, course_role_id: courseRole.id },
-    });
+    try {
+      await prisma.courseEnrollments.create({
+        data: { user_id: userId, course_offering_id: courseOfferingId, course_role_id: courseRole.id },
+      });
+    } catch (err) {
+      // another launch enrolled this user first - nothing left for us to do,
+      // unless the role it picked is already stale (handled below on retry)
+      if (!isUniqueConstraintError(err)) throw err;
+    }
   } else if (existing.course_role_id !== courseRole.id) {
     // role changed since last launch (eg became the instructor) - update it
     await prisma.courseEnrollments.update({

@@ -53,6 +53,31 @@ test("validateLtiLaunch accepts a properly signed request", async () => {
   assert.equal(result.valid, true);
 });
 
+// custom_inst_book_id/custom_course_offering_id get used as prisma ids
+// downstream, so a value like "12.5" needs to come back null here instead of
+// a truthy non-integer that would blow up that query with a type error
+test("validateLtiLaunch rejects non-integer custom_inst_book_id instead of passing it through", async () => {
+  const { req, body } = buildSignedBody({ custom_inst_book_id: "12.5" });
+  req.body = body;
+
+  const result = await validateLtiLaunch(req, async k => (k === key ? secret : null));
+  assert.equal(result.valid, true);
+  assert.equal(result.context?.customInstBookId, null);
+});
+
+test("validateLtiLaunch captures lis_outcome_service_url and lis_result_sourcedid when present", async () => {
+  const { req, body } = buildSignedBody({
+    lis_outcome_service_url: "https://canvas.example.edu/api/lti/v1/tools/1/grade_passback",
+    lis_result_sourcedid: "abc123",
+  });
+  req.body = body;
+
+  const result = await validateLtiLaunch(req, async k => (k === key ? secret : null));
+  assert.equal(result.valid, true);
+  assert.equal(result.context?.lisOutcomeServiceUrl, "https://canvas.example.edu/api/lti/v1/tools/1/grade_passback");
+  assert.equal(result.context?.lisResultSourcedid, "abc123");
+});
+
 test("validateLtiLaunch rejects a tampered request", async () => {
   const { req, body } = buildSignedBody();
   req.body = { ...body, resource_link_id: "tampered" };

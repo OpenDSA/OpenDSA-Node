@@ -20,6 +20,10 @@ export interface SessionData {
   userId?: number;
   csrfToken?: string;
   expiresAt?: number;
+  // stashed here after an lti launch so grade passback (not built yet) has
+  // somewhere to read them back from later - see lti/post-launch.ts
+  lisOutcomeServiceUrl?: string;
+  lisResultSourcedid?: string;
 }
 
 declare global {

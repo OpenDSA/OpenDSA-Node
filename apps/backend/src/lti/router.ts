@@ -56,6 +56,11 @@ ltiRouter.post("/lti/launch", async (req, res) => {
     for (const key of Object.keys(req.authSession)) Reflect.deleteProperty(req.authSession, key);
     req.authSession.userId = user.id;
     req.authSession.expiresAt = Date.now() + sessionLifetimeSeconds * 1000;
+    // not reporting grades back to canvas yet, but hang onto these so that
+    // work has something to read once it exists instead of needing another
+    // launch to get them back
+    if (context.lisOutcomeServiceUrl) req.authSession.lisOutcomeServiceUrl = context.lisOutcomeServiceUrl;
+    if (context.lisResultSourcedid) req.authSession.lisResultSourcedid = context.lisResultSourcedid;
     await req.authSession.save();
   }
   // else: request wasnt secure (shouldnt happen going through the real

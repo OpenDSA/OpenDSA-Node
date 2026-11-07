@@ -16,4 +16,8 @@ export interface LtiLaunchContext {
   lmsTypeName: string;
   customInstBookId: number | null;
   customCourseOfferingId: number | null;
+  // canvas sends these on graded launches so we can report a score back later.
+  // not doing anything with them yet besides holding onto them - see post-launch.ts
+  lisOutcomeServiceUrl: string | null;
+  lisResultSourcedid: string | null;
 }
