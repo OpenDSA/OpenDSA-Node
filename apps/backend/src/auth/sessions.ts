@@ -38,7 +38,7 @@ export const cookieSession: RequestHandler = async (req, res, next) => {
       cookieName: sessionCookieName,
       password: sessionSecret,
       ttl: sessionLifetimeSeconds,
-      cookieOptions: { httpOnly: true, sameSite: "lax", secure: productionAuth, path: "/" },
+      cookieOptions: { httpOnly: true, sameSite: productionAuth ? "none" : "lax", secure: productionAuth, path: "/" }, // none in prod so the cookie survives canvas's cross site iframe
     });
     // Keep login expiry fixed even when saving a new CSRF cookie later.
     if (req.authSession.userId !== undefined &&
