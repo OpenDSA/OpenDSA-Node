@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { hash } from "bcryptjs";
+import { hashPassword } from "../src/auth/passwords";
 import { PrismaClient } from "@prisma/client";
 
 // Run sequentially: role names, time zones, courses and offerings lack unique keys.
@@ -9,7 +9,7 @@ export async function seedAcademic(prisma: PrismaClient) {
   if (password && (Buffer.byteLength(password, "utf8") < 8 || Buffer.byteLength(password, "utf8") > 72)) {
     throw new Error("SEED_AUTH_PASSWORD must be 8–72 UTF-8 bytes.");
   }
-  const passwordHash = password ? await hash(password, 10) : undefined;
+  const passwordHash = password ? await hashPassword(password) : undefined;
   const roles = [];
   for (const name of ["Administrator", "Instructor", "Researcher", "Regular User"]) {
     const admin = name === "Administrator";

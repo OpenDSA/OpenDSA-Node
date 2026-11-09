@@ -47,6 +47,27 @@ one Discovery has.
   separate opendsa sidecars with their own compiled-book cache, so content
   compiled on one pod wouldn't show up on the other. Fine for now.
 
+### Compiled book persistence (`opendsa-books` PVC)
+
+Compiled output (`/opendsa/Books`) is a separate `ceph-rbd` PVC (`35-opendsa-books-pvc.yaml`),
+mounted only in the `opendsa` container with no `subPath` - nothing else lives at
+that path in the image, so mounting the whole volume there is safe. It's
+`ReadWriteOnce` like everything else on Discovery, which is fine since only
+this one Pod ever mounts it.
+
+This is also why `40-backend-deployment.yaml` sets `strategy: type: Recreate`
+on the Deployment instead of the Kubernetes default `RollingUpdate`. RWO means
+only one Pod can hold the volume at a time - `RollingUpdate` tries to start the
+new Pod before killing the old one, which fails to attach the still-held
+volume (multi-attach error, stuck rollout). `Recreate` fully terminates the old
+Pod first, trading a few seconds of downtime on deploy for a rollout that
+actually completes.
+
+The StorageClass's `reclaimPolicy` is `Delete` (confirmed, same as the MySQL
+PVC) - deleting this PVC deletes the compiled books permanently, no retain or
+recovery. Treat it like the database: not something to delete casually once it
+holds real content.
+
 One extra wrinkle: the `opendsa` image needed its own Dockerfile. Its source
 lives in `OpenDSA-DevStack`, and none of the Dockerfiles there (`Dockerfile`,
 `Dockerfile.server`, `Dockerfile.deforms`) actually copy the app code into
@@ -55,16 +76,40 @@ Docker Hub is the same way. Turns out it always relied on a bind mount for
 the actual source (docker-compose locally, `ssh + git pull` on staging).
 Discovery has no host filesystem to mount from, so that doesn't work here.
 `k8s/opendsa/Dockerfile.discovery` is just `Dockerfile.server` plus a
-`COPY . .` at the end so it's actually self-contained - didn't touch
-anything in DevStack itself (no push access there anyway). Build it from
-`OpenDSA-DevStack/opendsa` as the context:
+`COPY . .` at the end so it's actually self-contained, plus one more `COPY`
+that overrides `app.py` with our own locked-down version (see "Served
+content scoping" below) - didn't touch anything in DevStack itself (no push
+access there anyway). Build it from `OpenDSA-DevStack/opendsa` as the
+context, with a second build context pointing at this repo so the Dockerfile
+can reach the patched `app.py`:
 
 ```
 docker build --platform=linux/amd64 \
+  --build-context opendsa-node=<path-to-opendsa-node> \
   -f <path-to-opendsa-node>/k8s/opendsa/Dockerfile.discovery \
   -t container.cs.vt.edu/jaden/opendsa-node/opendsa:__TAG__ .
 docker push container.cs.vt.edu/jaden/opendsa-node/opendsa:__TAG__
 ```
+
+### Served content scoping
+
+Stock `app.py` serves anything under `/opendsa` and lists any directory.
+Too open - `app.py`/`tools/` shouldn't be public. Too narrow too - books
+load shared JS from `AV/`, `DataStructures/`, `lib/`, `Exercises/`, and
+`khan-exercises/` at the root, not just `Books/`. Confirmed via
+`ODSA_RST_Module.py`'s `:scripts:`/`:links:` validation plus a grep across
+all RST content.
+
+`Metadata/inlineav/` also allowed - some pages iframe it directly via raw
+html. Only that subpath though, not all of `Metadata/`, since that dir also
+has our build scripts.
+
+`app.py` and `60-ingress.yaml` both enforce this same path list. Dotfiles
+blocked, no directory listing, nothing outside the allowed paths served.
+
+Not blocked: a few vendored khan-exercises/AV scripts (`validate.rb`,
+`generator.py`). Public Khan Academy code, no user input involved, not
+worth carving out.
 
 ## Namespace
 
@@ -130,6 +175,10 @@ kubectl get ns 91762f26-opendsanode
      --command -- npx tsx prisma/seed.ts
    ```
 8. ```
+   kubectl apply -f k8s/35-opendsa-books-pvc.yaml
+   kubectl get pvc opendsa-books -n 91762f26-opendsanode   # expect Bound
+   ```
+9. ```
    kubectl apply -f k8s/40-backend-deployment.yaml -f k8s/41-backend-service.yaml -f k8s/42-opendsa-service.yaml
    kubectl port-forward -n 91762f26-opendsanode svc/backend 3000:3000
    curl localhost:3000/api/health
@@ -138,26 +187,70 @@ kubectl get ns 91762f26-opendsanode
    The backend Pod has 2 containers now (backend + opendsa), so
    `kubectl get pods -n 91762f26-opendsanode -l app=backend` should show
    `2/2` once both come up.
-9. ```
-   kubectl apply -f k8s/50-web-deployment.yaml -f k8s/51-web-service.yaml
-   kubectl port-forward -n 91762f26-opendsanode svc/web 8080:80
-   # browse localhost:8080, confirm the SPA loads
-   ```
 10. ```
+    kubectl apply -f k8s/50-web-deployment.yaml -f k8s/51-web-service.yaml
+    kubectl port-forward -n 91762f26-opendsanode svc/web 8080:80
+    # browse localhost:8080, confirm the SPA loads
+    ```
+11. ```
     kubectl apply -f k8s/60-ingress.yaml
     kubectl get ingress -n 91762f26-opendsanode
     # browse https://91762f26-opendsanode.discovery.cs.vt.edu/ and /api/health
     # (needs on-campus network or VPN - see ingress note below)
     ```
-11. Restart-safety checks:
+12. Restart-safety checks:
     ```
     kubectl rollout restart deployment/backend -n 91762f26-opendsanode
-    # replicas is 1 now (see opendsa sidecar notes above), so expect a
-    # short gap in /api/health during the restart - not instant anymore
+    # strategy is Recreate (see opendsa-books PVC notes above), so this
+    # fully stops the old pod before starting the new one - expect a real
+    # gap in /api/health during the restart, not a seamless rollover
 
     kubectl rollout restart deployment/mysql -n 91762f26-opendsanode
     # confirm /api/health/db still works after, data still there
+
+    # confirm compiled books survive too, not just the database:
+    kubectl exec -n 91762f26-opendsanode deploy/backend -c opendsa -- ls /opendsa/Books
     ```
+
+## Password authentication
+
+The backend now supports password authentication with `NODE_ENV=production`.
+Before deploying the updated backend, copy `12-auth-secret.example.yaml` to
+`12-auth-secret.yaml` (gitignored). Fill in a randomly generated `SESSION_SECRET`
+of at least 32 characters (`openssl rand -hex 32`) and the `PASSWORD_PEPPER` used
+to create passwords in the target database, then apply it:
+
+```sh
+kubectl apply -f k8s/12-auth-secret.yaml
+```
+
+`40-backend-deployment.yaml` reads both values from `opendsa-auth`. Do not apply
+the placeholder example directly. The local `.env` is not uploaded. Keep the
+session secret stable and identical across backend replicas; replacing it signs
+everyone out. Changing the pepper requires resetting affected passwords. Any
+password-seeding process must receive the same pepper; this Secret is not
+automatically attached to separate Jobs. The demo seed's production guard remains.
+
+The backend trusts one proxy hop (`TRUST_PROXY_HOPS=1`) for the direct
+Nginx ingress -> backend Service path. The ingress must overwrite client-supplied
+forwarded headers, and the backend must not be directly exposed through another
+public path. Recheck the hop count if routing changes; Express uses it for HTTPS
+detection and login rate limiting. Local direct HTTP uses zero trusted hops.
+
+Production auth routes require HTTPS as reported by the trusted ingress, and
+cookies use Secure, HttpOnly, SameSite=None (local dev stays SameSite=Lax -
+None is only needed in production so the session cookie survives Canvas's
+cross-site LTI iframe), and an eight-hour login lifetime.
+Health probes remain available over internal HTTP. After deploying matching web
+and backend images, verify HTTPS login/logout, cookie attributes, and that login
+survives a backend restart. A plain HTTP port-forward cannot test production
+login without an appropriate local HTTPS proxy. Clearing the browser cookie logs
+that browser out; a copied stateless cookie remains valid until expiry.
+Signed-in instructors can generate book content in production using their stored
+Canvas token. `BOOKS_PUBLIC_URL` points generated links at Discovery's `/Books`
+route. This creates ordinary book links; LTI launches remain a separate integration.
+Compiled book files persist across Pod replacement via the `opendsa-books` PVC
+(see the PVC notes below the sidecar section).
 
 ## Updating after a new image push
 
@@ -168,6 +261,10 @@ scale it to 0 first and check logs/exec instead.
 
 ## Notes / things to revisit
 
+- `k8s/opendsa/app.py` is a frozen copy of DevStack's `app.py` with our
+  content-scoping patch applied - if upstream ever adds a new route or
+  changes `app.py`, this won't pick it up until someone manually re-diffs
+  and updates our copy. Known tradeoff of having no push access upstream.
 - StorageClass for the MySQL PVC - confirmed, it's `ceph-rbd`.
 - Ingress whitelist annotation is now **on** (public internet, not just
   VT) - turned on 2026-10-19 at stakeholder request. Means the app is
@@ -178,6 +275,10 @@ scale it to 0 first and check logs/exec instead.
 - opendsa's resource requests/limits in `40-backend-deployment.yaml` are
   guesses - haven't actually run a real compile yet to know what it needs.
   Tune once we've tested it for real.
+- `opendsa-books` PVC size (5Gi) is also a guess, same reason - no real compile
+  yet to know actual book size on disk. `ceph-rbd` supports
+  `allowVolumeExpansion`, confirmed live so resizing later is a simple PVC
+  patch, no migration needed.
 - Still need to double check that compiled book HTML uses relative links,
   so serving it under `/Books` (Ingress -> opendsa directly) instead of
   `/OpenDSA` through nginx like the old Rails setup actually works fine.

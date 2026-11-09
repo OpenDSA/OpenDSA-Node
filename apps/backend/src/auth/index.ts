@@ -1,11 +1,11 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { RequestHandler, Router } from "express";
-import session from "express-session";
 import passport from "passport";
 import { Strategy } from "passport-local";
-import { compare, hashSync } from "bcryptjs";
+import { verifyPassword } from "./passwords";
 import { rateLimit } from "express-rate-limit";
 import { prisma } from "../db";
+import { cookieSession, productionAuth, sessionLifetimeSeconds } from "./sessions";
 
 export const authUserSelect = {
   id: true, email: true, first_name: true, last_name: true,
@@ -20,45 +20,36 @@ declare global {
     global_role: { name: string; can_manage_all_courses: boolean; can_edit_system_configuration: boolean };
   } }
 }
-declare module "express-session" { interface SessionData { csrfToken?: string } }
-
-// MemoryStore is intentionally restricted to local development/test usage.
-export function authEnabled() { return [undefined, "development", "test"].includes(process.env.NODE_ENV); }
-const sessionMiddleware = session({
-  name: "opendsa.sid", secret: process.env.SESSION_SECRET || randomBytes(32).toString("hex"),
-  resave: false, saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: "lax", secure: false },
-});
 export const authSession: RequestHandler = (req, res, next) => {
-  if (!authEnabled()) { next(); return; }
-  sessionMiddleware(req, res, next);
+  cookieSession(req, res, next);
 };
-export const passportSession: RequestHandler = (req, res, next) => {
-  if (!authEnabled()) { next(); return; }
-  passport.session()(req, res, next);
+export const restoreUser: RequestHandler = async (req, _res, next) => {
+  if (!req.authSession) { next(); return; }
+  try {
+    if (req.authSession.userId) {
+      const user = await loadUser(req.authSession.userId);
+      if (user) req.user = user;
+      else req.authSession.destroy();
+    }
+    next();
+  } catch (error) { next(error); }
 };
 export const initializePassport = passport.initialize();
-const dummyHash = hashSync(randomBytes(32).toString("hex"), 10);
 passport.use(new Strategy({ usernameField: "email" }, async (email, password, done) => {
   try {
     if (typeof email !== "string" || typeof password !== "string" || email.length > 255 ||
         !password || Buffer.byteLength(password, "utf8") > 72) { done(null, false); return; }
     const user = await prisma.users.findUnique({ where: { email: email.trim().toLowerCase() },
       select: { ...authUserSelect, encrypted_password: true } });
-    const validHash = user?.encrypted_password && /^\$2[ab]\$/.test(user.encrypted_password);
-    const valid = await compare(password, validHash ? user.encrypted_password : dummyHash);
-    if (!user || !validHash || !valid) { done(null, false); return; }
+    const valid = await verifyPassword(password, user?.encrypted_password);
+    if (!user || !valid) { done(null, false); return; }
     const { encrypted_password: _password, ...safeUser } = user;
     done(null, safeUser);
   } catch (error) { done(error); }
 }));
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser(async (id: number, done) => {
-  try { done(null, await loadUser(id) || false); } catch (error) { done(error); }
-});
 
 export const requireAuthentication: RequestHandler = (req, res, next) => {
-  if (!authEnabled()) { res.status(503).json({ error: "Persistent sessions must be configured before deploying password authentication." }); return; }
+  if (productionAuth && !req.secure) { res.status(400).json({ error: "HTTPS is required for authentication." }); return; }
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Sign in required." }); return; }
   next();
 };
@@ -76,7 +67,7 @@ export async function canManageOffering(user: Express.User, offeringId: number) 
   }, select: { id: true } });
 }
 export const requireCsrf: RequestHandler = (req, res, next) => {
-  const expected = req.session?.csrfToken;
+  const expected = req.authSession?.csrfToken;
   const supplied = req.get("X-CSRF-Token");
   if (!expected || !supplied || !/^[a-f0-9]{64}$/.test(supplied) || supplied.length !== expected.length ||
       !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) {
@@ -86,40 +77,39 @@ export const requireCsrf: RequestHandler = (req, res, next) => {
 };
 
 export const authRouter = Router();
-authRouter.use((_req, res, next) => {
+authRouter.use((req, res, next) => {
   res.set("Cache-Control", "no-store");
-  if (!authEnabled()) { res.status(503).json({ error: "Password authentication is development-only until persistent sessions are configured." }); return; }
+  if (productionAuth && !req.secure) { res.status(400).json({ error: "HTTPS is required for authentication." }); return; }
   next();
 });
-authRouter.get("/csrf", (req, res) => {
-  req.session.csrfToken ??= randomBytes(32).toString("hex");
-  res.json({ csrfToken: req.session.csrfToken });
+authRouter.get("/csrf", async (req, res) => {
+  req.authSession.csrfToken ??= randomBytes(32).toString("hex");
+  await req.authSession.save();
+  res.json({ csrfToken: req.authSession.csrfToken });
 });
 authRouter.get("/me", (req, res) => res.json({ user: req.user || null }));
 authRouter.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, limit: 10,
   standardHeaders: "draft-8", legacyHeaders: false,
   message: { error: "Too many login attempts. Try again later." } }), requireCsrf, (req, res, next) => {
-  passport.authenticate("local", (error: unknown, user: AuthUser | false) => {
+  passport.authenticate("local", { session: false }, (error: unknown, user: AuthUser | false) => {
     if (error) { next(error); return; }
     if (!user) { res.status(401).json({ error: "Invalid email or password." }); return; }
-    // Passport regenerates the session on login, preventing session fixation.
-    req.logIn(user, error => {
+    // Passport validates credentials; iron-session owns session persistence.
+    req.logIn(user, { session: false }, async error => {
       if (error) { next(error); return; }
-      req.session.csrfToken = randomBytes(32).toString("hex");
-      req.session.save(error => {
-        if (error) { next(error); return; }
-        res.json({ user, csrfToken: req.session.csrfToken });
-      });
+      try {
+        for (const key of Object.keys(req.authSession)) Reflect.deleteProperty(req.authSession, key);
+        req.authSession.userId = user.id;
+        req.authSession.expiresAt = Date.now() + sessionLifetimeSeconds * 1000;
+        req.authSession.csrfToken = randomBytes(32).toString("hex");
+        await req.authSession.save();
+        res.json({ user, csrfToken: req.authSession.csrfToken });
+      } catch (error) { next(error); }
     });
   })(req, res, next);
 });
-authRouter.post("/logout", requireAuthentication, requireCsrf, (req, res, next) => {
-  req.logout(error => {
-    if (error) { next(error); return; }
-    req.session.destroy(error => {
-      if (error) { next(error); return; }
-      res.clearCookie("opendsa.sid", { httpOnly: true, sameSite: "lax", secure: false });
-      res.status(204).end();
-    });
-  });
+authRouter.post("/logout", requireAuthentication, requireCsrf, (req, res) => {
+  delete req.user;
+  req.authSession.destroy();
+  res.status(204).end();
 });

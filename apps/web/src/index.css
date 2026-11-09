@@ -28,7 +28,8 @@ body {
 }
 
 .navbar a,
-.navbar button {
+.navbar button
+.navbar-right span {
   color: white;
   text-decoration: none;
   font-size: 15px;
@@ -53,8 +54,17 @@ body {
 .dropdown-button {
   background: none;
   border: none;
+  color: white;
+  font-size: 15px;
   cursor: pointer;
   padding: 20px 0;
+}
+
+.navbar-right button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 0;
 }
 
 .dropdown-menu {
@@ -148,4 +158,195 @@ button {
   main {
     padding: 15px;
   }
+}
+
+/*
+ * OpenDSA Homepage Styling
+ *
+ * AI Assistance Disclosure:
+ * I used AI (ChatGPT) to help generate the CSS styling for the OpenDSA
+ * homepage. The CSS creates a three-column layout using CSS Grid,
+ * formats the headings and paragraphs, adjusts the appearance of links
+ * and images, and makes the layout responsive for smaller screens.
+ */
+
+/* Creates a three-column layout for the homepage sections. */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 50px 30px;
+  padding: 30px 20px;
+  align-items: start;
+}
+
+/* Centers the content within each column. */
+.home-column {
+  text-align: center;
+  min-width: 0;
+}
+
+/* Styles the section headings and adds a line underneath each heading. */
+.home-column h2 {
+  font-size: 28px;
+  font-weight: 500;
+  border-bottom: 1px solid #777;
+  padding-bottom: 8px;
+  margin-bottom: 15px;
+}
+
+/* Adjusts the paragraph text size, spacing, and readability. */
+.home-column p {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+/* Changes the appearance of links within the homepage sections. */
+.home-column a {
+  color: #269bb3;
+  text-decoration: none;
+}
+
+/* Underlines links when the user hovers over them. */
+.home-column a:hover {
+  text-decoration: underline;
+}
+
+/* Makes images fit within their columns without stretching them. */
+.home-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid #ccc;
+}
+
+/* Stacks the columns vertically on smaller screens. */
+@media (max-width: 768px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+}
+
+/*
+ * Create Textbook Page Styling
+ *
+ * AI Assistance Disclosure:
+ * I used AI (ChatGPT) to help generate the CSS for the New Textbook
+ * page. The styling organizes the form fields into aligned rows,
+ * formats the input elements, and adjusts the layout for smaller screens.
+ */
+
+.textbook-page h1 {
+  margin-bottom: 15px;
+}
+
+.textbook-container {
+  max-width: 750px;
+  margin: 0 auto;
+}
+
+.textbook-container a {
+  color: #269bb3;
+  text-decoration: none;
+}
+
+.textbook-container a:hover {
+  text-decoration: underline;
+}
+
+.textbook-required {
+  color: #b33;
+  font-weight: bold;
+}
+
+.textbook-field {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 15px;
+}
+
+.textbook-field label {
+  text-align: right;
+  padding-top: 10px;
+}
+
+.textbook-field input,
+.textbook-field select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 14px;
+}
+
+.textbook-field small {
+  display: block;
+  color: #946c32;
+  margin-top: 5px;
+}
+
+.textbook-submit {
+  margin-left: 180px;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .textbook-container {
+    margin: 0;
+  }
+
+  .textbook-field {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .textbook-field label {
+    text-align: left;
+  }
+
+  .textbook-submit {
+    margin-left: 0;
+  }
+}
+
+.navbar .admin-link {
+  font-size: 22px;
+}
+
+/* Administrator Dashboard Styling */
+
+.admin-dashboard {
+  padding: 20px;
+}
+
+.admin-dashboard h2 {
+  margin-top: 30px;
+  margin-bottom: 15px;
+}
+
+.admin-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+  background-color: #f5f5f5;
+}
+
+.admin-dashboard th,
+.admin-dashboard td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.admin-dashboard th {
+  background-color: #e5e5e5;
+  font-weight: bold;
+}
+
+.admin-dashboard tr:nth-child(even) {
+  background-color: #eeeeee;
 }

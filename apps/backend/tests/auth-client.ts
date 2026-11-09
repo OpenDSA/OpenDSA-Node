@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { hash } from "bcryptjs";
+import { hashPassword } from "../src/auth/passwords";
 import { prisma } from "../src/db";
 
 // Supply a test-only hash during login without changing any stored password.
@@ -8,7 +8,7 @@ export async function signInForTest(base: string, email = "seed-academic-instruc
   const { csrfToken } = await csrfResponse.json();
   const cookie = csrfResponse.headers.get("set-cookie")!.split(";")[0];
   const original = prisma.users.findUnique;
-  const passwordHash = await hash("Auth-test-password", 4);
+  const passwordHash = await hashPassword("Auth-test-password");
   prisma.users.findUnique = (async (args: any) => {
     const user = await original.call(prisma.users, args);
     return user && args.select?.encrypted_password ? { ...user, encrypted_password: passwordHash } : user;
@@ -19,7 +19,7 @@ export async function signInForTest(base: string, email = "seed-academic-instruc
     }, body: JSON.stringify({ email, password: "Auth-test-password" }) });
     assert.equal(response.status, 200);
     const body = await response.json();
-    assert.notEqual(response.headers.get("set-cookie")!.split(";")[0], cookie, "Login must rotate the session ID");
+    assert.notEqual(response.headers.get("set-cookie")!.split(";")[0], cookie, "Login must replace the session cookie");
     assert.notEqual(body.csrfToken, csrfToken, "Login must rotate the CSRF token");
     return { Cookie: response.headers.get("set-cookie")!.split(";")[0], "X-CSRF-Token": body.csrfToken };
   } finally { prisma.users.findUnique = original; }

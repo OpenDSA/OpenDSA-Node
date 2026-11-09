@@ -2,8 +2,22 @@ import { requireAuthentication, requireInstructor, requireCsrf, canManageOfferin
 import { Router } from "express";
 import { createCourseOffering, parseCourseOffering, courseOfferingError, getGenerationContext, generateBook } from "../services/course-offerings";
 import { prisma } from "../db";
+import { createTextbook, isTextbookInstance } from "../services/textbooks";
 
 export const courseOfferingsRouter = Router();
+
+courseOfferingsRouter.post("/textbooks", requireAuthentication, requireInstructor, requireCsrf, async (req, res) => {
+  try {
+    const offering = await createTextbook(req.body, req.user!.id);
+    if (offering.reused && !await canManageOffering(req.user!, offering.id)) {
+      res.status(403).json({ error: "You cannot manage this offering." }); return;
+    }
+    res.status(offering.reused ? 200 : 201).json({ data: offering, url: `/course-offerings/${offering.id}` });
+  } catch (error) {
+    const result = courseOfferingError(error);
+    res.status(result.status).json({ error: result.error });
+  }
+});
 
 courseOfferingsRouter.post("/course-offerings", requireAuthentication, requireInstructor, requireCsrf, async (req, res) => {
   try {
@@ -32,7 +46,7 @@ courseOfferingsRouter.get("/course-offerings/:id", async (req, res) => {
       inst_books: { select: { id: true, title: true }, orderBy: { id: "asc" } },
     } });
     if (!offering) { res.status(404).json({ error: "Offering not found." }); return; }
-    res.json({ data: offering });
+    res.json({ data: { ...offering, standalone: isTextbookInstance(offering.lms_instance.url) } });
   } catch { res.status(500).json({ error: "Unable to load the offering." }); }
 });
 
@@ -45,8 +59,11 @@ courseOfferingsRouter.post("/course-offerings/:id/generate", requireAuthenticati
       res.status(403).json({ error: "You cannot manage this offering." }); return;
     }
     const offering = await prisma.courseOfferings.findUnique({ where: { id: Number(req.params.id) },
-      include: { inst_books: { select: { id: true, user_id: true } } } });
+      include: { inst_books: { select: { id: true, user_id: true } }, lms_instance: { select: { url: true } } } });
     if (!offering) { res.status(404).json({ error: "Offering not found." }); return; }
+    if (isTextbookInstance(offering.lms_instance.url)) {
+      res.status(400).json({ error: "Standalone textbook compilation is not available yet." }); return;
+    }
     const context = await getGenerationContext(offering.lms_instance_id, req.user!.id);
     if (offering.inst_books.length !== 1) {
       res.status(403).json({ error: "Offering must have exactly one book." }); return;

@@ -11,6 +11,13 @@ spec:
   # inconsistent copy of compiled book content. Revisit if that becomes a
   # real problem.
   replicas: 1
+  # ceph-rbd is ReadWriteOnce, and opendsa-books below is mounted from it - the
+  # default RollingUpdate strategy brings up the new pod before killing the old
+  # one, which means two pods trying to attach the same RWO volume at once
+  # (multi-attach error, stuck rollout). Recreate terminates the old pod fully
+  # first, so there's a few seconds of downtime on deploy instead of a hang.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend
@@ -24,26 +31,37 @@ spec:
       volumes:
         - name: opendsa-shared
           emptyDir: {}
+        - name: opendsa-books
+          persistentVolumeClaim:
+            claimName: opendsa-books
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:latest
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:lti-63cc3c5
           ports:
             - containerPort: 3000
           env:
             - name: PORT
               value: "3000"
+            - name: NODE_ENV
+              value: production
+            # Direct ingress -> backend path; ingress must overwrite forwarded headers.
+            - name: TRUST_PROXY_HOPS
+              value: "1"
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: SESSION_SECRET
+            - name: PASSWORD_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: opendsa-auth
+                  key: PASSWORD_PEPPER
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: opendsa-db-credentials
                   key: DATABASE_URL
-            # without this express-session falls back to a random secret on
-            # every process start, logging everyone out on each restart
-            - name: SESSION_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: opendsa-db-credentials
-                  key: SESSION_SECRET
             # Book-compile config handoff to the opendsa sidecar (same
             # Pod, so localhost - no Service hop needed). The backend
             # always writes to $OPENDSA_SHARED_DIR/config/temp/<file>.json;
@@ -53,6 +71,8 @@ spec:
               value: /mnt/opendsa-shared
             - name: CONFIG_API_LINK
               value: http://localhost:8080/api/configure/
+            - name: BOOKS_PUBLIC_URL
+              value: https://91762f26-opendsanode.discovery.cs.vt.edu/Books
           volumeMounts:
             - name: opendsa-shared
               mountPath: /mnt/opendsa-shared
@@ -79,7 +99,7 @@ spec:
               cpu: 500m
               memory: 512Mi
         - name: opendsa
-          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:latest
+          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:scoping-d60346f
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -94,15 +114,19 @@ spec:
             - name: opendsa-shared
               mountPath: /opendsa/config/temp
               subPath: config/temp
+            # no subPath here - nothing in the opendsa image ships content at
+            # this path already, so mounting the whole pvc root is safe
+            - name: opendsa-books
+              mountPath: /opendsa/Books
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
