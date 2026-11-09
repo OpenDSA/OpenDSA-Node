@@ -1,14 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { sanitizeFilename } from "../course_creation/utils";
+import { sanitizeFilename } from "./utils";
 
 // ============================================================================
 // simple2full Expansion
 // ============================================================================
 //
-// The OpenDSA compiler container owns the RST tree, so config expansion has to
-// happen there. We hand it a JSON file through the shared directory, let Flask
-// run `tools/simple2full.py`, and read the expanded "full" config back.
+
+// Uses the "opendsa" frontend simple2full API to build an expanded config out of a small config file,
+// for loading into the database.
 
 export interface Simple2FullOptions {
   userId: number;

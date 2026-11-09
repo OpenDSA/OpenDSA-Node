@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
-import { expandBookConfig, Simple2FullError } from "./simple2full";
+import { expandBookConfig, Simple2FullError } from "../course_creation/compile-config";
 
 // ============================================================================
 // Book Config Import / Persistence

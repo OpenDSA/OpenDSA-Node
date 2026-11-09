@@ -3,7 +3,7 @@ import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { getCompileConfig } from "../course_creation/config";
 import { BookConfigError, importBookConfig } from "../services/import-book-config";
-import { Simple2FullError } from "../services/simple2full";
+import { Simple2FullError } from "../course_creation/compile-config";
 
 export const instBooksRouter = Router();
 
