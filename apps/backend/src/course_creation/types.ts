@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import type { BookCompileInput as CompileInput } from "./contract";
 
 // ============================================================================
 // Input & Output Types
@@ -15,6 +16,7 @@ export interface GenerateCourseInput {
 
   openDsaSharedDir: string;
   configApiLink: string;
+  timeoutMs?: number;
 }
 
 export interface OpenDsaCompileResponse {
@@ -31,54 +33,17 @@ export interface GenerateCourseOutput {
   configFilePath: string;
   configPath: string;
   buildPath: string;
-  bookConfig: BookConfigJson;
+  bookConfig: CompileInput;
   compileResponse: OpenDsaCompileResponse;
 }
 
-// ============================================================================
-// Book Configuration JSON Interfaces (Matches show.json.jbuilder contract)
-// ============================================================================
-
-export interface BookConfigJson {
-  inst_book_id: number;
-  title: string;
-  desc: string | null;
-  last_compiled: string | null;
-  chapters: Record<string, ChapterConfigJson>;
-  course_id?: string;
-  LMS_url?: string;
-  [key: string]: unknown;
-}
-
-export interface ChapterConfigJson {
-  lms_chapter_id: number | null;
-  lms_assignment_group_id: number | null;
-  [modulePath: string]: ModuleConfigJson | number | null;
-}
-
-export interface ModuleConfigJson {
-  lms_module_item_id: number | null;
-  lms_section_item_id: number | null;
-  lms_assignment_id: number | null;
-  long_name: string;
-  due_dates: string | null;
-  sections: Record<string, SectionConfigJson> | null;
-}
-
-export interface SectionConfigJson {
-  id: number;
-  soft_deadline: string | null;
-  hard_deadline: string | null;
-  showsection: boolean | null;
-  lms_item_id: number | null;
-  lms_assignment_id: number | null;
-  learning_tool?: string;
-  resource_type?: string | null;
-  resource_name?: string | null;
-  points?: number;
-  launch_url?: string;
-  [exerciseShortName: string]: unknown;
-}
+export type {
+  BookCompileInput,
+  ChapterCompileConfig,
+  ExerciseCompileConfig,
+  ModuleCompileConfig,
+  SectionCompileConfig,
+} from "./contract";
 
 // ============================================================================
 // Prisma Query Shape (Single Query to Avoid N+1s)
@@ -104,8 +69,10 @@ export const instBookFullInclude = {
         include: {
           inst_module: true,
           inst_sections: {
+            orderBy: { position: "asc" as const },
             include: {
               inst_book_section_exercises: {
+                orderBy: { id: "asc" as const },
                 include: {
                   inst_exercise: true,
                 },
@@ -123,5 +90,8 @@ export type LoadedInstBook = Prisma.InstBooksGetPayload<{
 }>;
 
 export type LoadedChapter = LoadedInstBook["inst_chapters"][number];
-
-export type LoadedChapterModule = LoadedChapter["inst_chapter_modules"][number];
+export type LoadedChapterModule =
+  LoadedChapter["inst_chapter_modules"][number];
+export type LoadedSection = LoadedChapterModule["inst_sections"][number];
+export type LoadedSectionExercise =
+  LoadedSection["inst_book_section_exercises"][number];

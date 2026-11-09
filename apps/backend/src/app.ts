@@ -8,7 +8,8 @@ export const app = express();
 app.set("trust proxy", trustProxyHops);
 
 // Express and core library setup
-app.use(express.json());
+// Book configs can be several MB when pasted/uploaded in full.
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(authSession);

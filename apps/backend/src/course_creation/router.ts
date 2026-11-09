@@ -1,8 +1,10 @@
 import { requireAuthentication, requireCsrf, canManageOffering } from "../auth";
 import { prisma } from "../db";
 import { Request, Response, Router } from "express";
+import { BookCompileError } from "./compile_book";
+import { getCompileConfig } from "./config";
 import { generateCourse } from "./generate_course";
-import { GenerateCourseInput } from "./types";
+import type { GenerateCourseInput } from "./types";
 
 export const generateCourseRouter = Router();
 
@@ -31,6 +33,7 @@ generateCourseRouter.post(
         return;
       }
 
+      const config = getCompileConfig();
       if ("userId" in req.body) {
         res.status(400).json({ error: "User identity comes from your session." }); return;
       }
@@ -45,13 +48,19 @@ generateCourseRouter.post(
         launchUrl,
         resourceSelectionUrl,
         extrtoolLaunchBaseUrl,
-        openDsaSharedDir: process.env.OPENDSA_SHARED_DIR || "public/OpenDSA", // TODO: decouple env var handling
-        configApiLink: process.env.CONFIG_API_LINK || "http://opendsa:8080/api/configure/",
+        openDsaSharedDir: config.openDsaSharedDir,
+        configApiLink: config.configApiLink,
+        timeoutMs: config.timeoutMs,
       });
 
       res.status(200).json(result);
     } catch (error) {
-      res.status(500).json({ error: "Course generation failed." });
+      if (error instanceof BookCompileError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   }
 );
