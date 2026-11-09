@@ -130,6 +130,7 @@ export async function validateLtiLaunch(
     lisResultSourcedid: str(body["lis_result_sourcedid"]) || null,
   };
 
+
   return { valid: true, context };
 }
 
