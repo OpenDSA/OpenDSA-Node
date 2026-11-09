@@ -23,12 +23,54 @@ spec:
                 name: backend
                 port:
                   number: 3000
-          # Routed straight to the opendsa sidecar (not through web/nginx) -
-          # see k8s/40-backend-deployment.yaml. Scoped to /Books specifically,
-          # not /, since opendsa's Flask app has a catch-all static-file
-          # route off its own working directory - a wide-open path would
-          # also expose things like its app.py and Makefile.
+          # Routed straight to the opendsa sidecar, scoped to just the
+          # paths it needs to serve - see "served content scoping" in
+          # k8s/README.md for why these six specifically.
           - path: /Books
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          - path: /AV
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          - path: /DataStructures
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          - path: /lib
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          - path: /Exercises
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          - path: /khan-exercises
+            pathType: Prefix
+            backend:
+              service:
+                name: opendsa
+                port:
+                  number: 8080
+          # scoped to inlineav specifically, not all of /Metadata - that
+          # dir also has our build scripts in it
+          - path: /Metadata/inlineav
             pathType: Prefix
             backend:
               service:

@@ -7,10 +7,11 @@
 #
 # Build from the OpenDSA-DevStack/opendsa directory as context:
 #   docker build --platform=linux/amd64 \
-#     -f ../OpenDSA-Node/k8s/opendsa/Dockerfile.discovery \
+#     --build-context opendsa-node=<path-to-opendsa-node> \
+#     -f <path-to-opendsa-node>/k8s/opendsa/Dockerfile.discovery \
 #     -t container.cs.vt.edu/jaden/opendsa-node/opendsa:latest .
-# (run from OpenDSA-DevStack/opendsa; adjust the -f path to wherever your
-# OpenDSA-Node checkout actually is)
+# (run from OpenDSA-DevStack/opendsa; --build-context points at your
+# OpenDSA-Node checkout, needed for the app.py override below)
 
 FROM node:22-alpine3.20 AS node
 FROM python:3.13-alpine3.20
@@ -50,5 +51,9 @@ RUN pip3 install -r requirements.txt
 # into the image, since Discovery has no host filesystem to bind-mount it
 # from at runtime.
 COPY . .
+
+# locks down served content to what books actually need - see
+# k8s/opendsa/app.py. no push access upstream, so overriding post-COPY
+COPY --from=opendsa-node k8s/opendsa/app.py app.py
 
 CMD ["make", "help", "webserver"]

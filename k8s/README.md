@@ -76,16 +76,40 @@ Docker Hub is the same way. Turns out it always relied on a bind mount for
 the actual source (docker-compose locally, `ssh + git pull` on staging).
 Discovery has no host filesystem to mount from, so that doesn't work here.
 `k8s/opendsa/Dockerfile.discovery` is just `Dockerfile.server` plus a
-`COPY . .` at the end so it's actually self-contained - didn't touch
-anything in DevStack itself (no push access there anyway). Build it from
-`OpenDSA-DevStack/opendsa` as the context:
+`COPY . .` at the end so it's actually self-contained, plus one more `COPY`
+that overrides `app.py` with our own locked-down version (see "Served
+content scoping" below) - didn't touch anything in DevStack itself (no push
+access there anyway). Build it from `OpenDSA-DevStack/opendsa` as the
+context, with a second build context pointing at this repo so the Dockerfile
+can reach the patched `app.py`:
 
 ```
 docker build --platform=linux/amd64 \
+  --build-context opendsa-node=<path-to-opendsa-node> \
   -f <path-to-opendsa-node>/k8s/opendsa/Dockerfile.discovery \
   -t container.cs.vt.edu/jaden/opendsa-node/opendsa:__TAG__ .
 docker push container.cs.vt.edu/jaden/opendsa-node/opendsa:__TAG__
 ```
+
+### Served content scoping
+
+Stock `app.py` serves anything under `/opendsa` and lists any directory.
+Too open - `app.py`/`tools/` shouldn't be public. Too narrow too - books
+load shared JS from `AV/`, `DataStructures/`, `lib/`, `Exercises/`, and
+`khan-exercises/` at the root, not just `Books/`. Confirmed via
+`ODSA_RST_Module.py`'s `:scripts:`/`:links:` validation plus a grep across
+all RST content.
+
+`Metadata/inlineav/` also allowed - some pages iframe it directly via raw
+html. Only that subpath though, not all of `Metadata/`, since that dir also
+has our build scripts.
+
+`app.py` and `60-ingress.yaml` both enforce this same path list. Dotfiles
+blocked, no directory listing, nothing outside the allowed paths served.
+
+Not blocked: a few vendored khan-exercises/AV scripts (`validate.rb`,
+`generator.py`). Public Khan Academy code, no user input involved, not
+worth carving out.
 
 ## Namespace
 
@@ -237,6 +261,10 @@ scale it to 0 first and check logs/exec instead.
 
 ## Notes / things to revisit
 
+- `k8s/opendsa/app.py` is a frozen copy of DevStack's `app.py` with our
+  content-scoping patch applied - if upstream ever adds a new route or
+  changes `app.py`, this won't pick it up until someone manually re-diffs
+  and updates our copy. Known tradeoff of having no push access upstream.
 - StorageClass for the MySQL PVC - confirmed, it's `ceph-rbd`.
 - Ingress whitelist annotation is now **on** (public internet, not just
   VT) - turned on 2026-10-19 at stakeholder request. Means the app is
@@ -249,7 +277,7 @@ scale it to 0 first and check logs/exec instead.
   Tune once we've tested it for real.
 - `opendsa-books` PVC size (5Gi) is also a guess, same reason - no real compile
   yet to know actual book size on disk. `ceph-rbd` supports
-  `allowVolumeExpansion`, confirmed live, so resizing later is a simple PVC
+  `allowVolumeExpansion`, confirmed live so resizing later is a simple PVC
   patch, no migration needed.
 - Still need to double check that compiled book HTML uses relative links,
   so serving it under `/Books` (Ingress -> opendsa directly) instead of
