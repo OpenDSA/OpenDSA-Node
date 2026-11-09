@@ -8,6 +8,11 @@ from argparse import ArgumentParser
 
 app = Flask(__name__)
 
+# k8s probes hit / for health before, broke once listing got disabled
+@app.route('/healthz')
+def healthz():
+    return 'ok'
+
 ############################## Direct File Index ###############################
 
 # patched from upstream - locked down to the dirs books actually need,

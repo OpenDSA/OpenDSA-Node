@@ -99,7 +99,7 @@ spec:
               cpu: 500m
               memory: 512Mi
         - name: opendsa
-          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:latest
+          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:scoping-d60346f
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -120,13 +120,13 @@ spec:
               mountPath: /opendsa/Books
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
