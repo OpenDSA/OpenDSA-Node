@@ -108,6 +108,52 @@ export interface BookCompileInput extends Record<string, unknown> {
   LMS_url: string;
 }
 
+/**
+ * Top-level book options the compiler accepts. `ODSA_Config` rejects unknown
+ * top-level fields, so options like `glob_pe_options` (consumed by simple2full
+ * only) must stay in `InstBook.options` but not be sent to configure.py.
+ */
+export const BOOK_OPTION_FIELDS = new Set<string>([
+  "assumes",
+  "build_cmap",
+  "build_dir",
+  "build_JSAV",
+  "chapter_name",
+  "code_dir",
+  "code_lang",
+  "dispModComp",
+  "glob_exer_options",
+  "glob_mod_options",
+  "html_css_files",
+  "html_js_files",
+  "html_theme_options",
+  "include_tree_view",
+  "lang",
+  "max_toc_depth",
+  "narration_enabled",
+  "req_full_ss",
+  "sphinx_debug",
+  "start_chap_num",
+  "suppress_todo",
+  "tabbed_codeinc",
+  "tag",
+  "theme",
+  "zeropt_assignments",
+]);
+
+export function filterBookOptions(
+  source: Record<string, unknown> | null
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (!source) return result;
+  for (const [key, value] of Object.entries(source)) {
+    if (BOOK_OPTION_FIELDS.has(key)) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function pickFields(
   source: Record<string, unknown> | null,
   fields: readonly string[]
@@ -122,11 +168,21 @@ function pickFields(
   return result;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 /** Keep only compiler-supported exercise settings from the stored JSON blob. */
 export function filterExerciseConfig(
   source: Record<string, unknown> | null
 ): Record<string, unknown> {
-  return pickFields(source, EXERCISE_CONFIG_FIELDS);
+  const result = pickFields(source, EXERCISE_CONFIG_FIELDS);
+  // The serializer/compiler expect exer_options to be an object; drop a
+  // malformed snapshot value rather than letting configure.py fail later.
+  if ("exer_options" in result && !isPlainObject(result.exer_options)) {
+    delete result.exer_options;
+  }
+  return result;
 }
 
 /** Keep only the section fields the compiler understands for external tools. */

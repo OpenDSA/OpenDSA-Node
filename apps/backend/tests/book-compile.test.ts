@@ -409,6 +409,7 @@ test("book options cannot overwrite authoritative book fields", () => {
         LMS_url: "https://evil.example",
         course_id: "evil",
         build_dir: "Books",
+        glob_pe_options: { points: 2 },
       },
     })
   );
@@ -418,6 +419,9 @@ test("book options cannot overwrite authoritative book fields", () => {
   assert.deepEqual(input.chapters, {});
   assert.equal(input.LMS_url, "https://canvas.example");
   assert.equal(input.course_id, "123");
+  // simple2full-only options stay in the database but never reach configure.py.
+  assert.equal("glob_pe_options" in input, false);
+  assert.equal(input.build_dir, "Books");
 });
 
 test("falls back to empty LMS strings when the book has no course offering", () => {

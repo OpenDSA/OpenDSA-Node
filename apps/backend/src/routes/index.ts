@@ -5,6 +5,7 @@ import { generateCourseRouter } from "../course_creation";
 
 import { courseOfferingsRouter } from "./course-offerings";
 import { courseOptionsRouter } from "./course-options";
+import { instBooksRouter } from "./inst-books";
 import { ltiRouter } from "../lti/router";
 
 export const apiRouter = Router();
@@ -29,5 +30,6 @@ apiRouter.use("/auth", authRouter);
 // Add router files for each endpoint group here.
 apiRouter.use(courseOptionsRouter);
 apiRouter.use(courseOfferingsRouter);
+apiRouter.use(instBooksRouter);
 apiRouter.use(generateCourseRouter);
 apiRouter.use(ltiRouter);

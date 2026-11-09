@@ -1,5 +1,5 @@
-import path from "node:path";
 import { generateCourse } from "../course_creation/generate_course";
+import { getCompileConfig } from "../course_creation/config";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { cloneBook } from "./clone-book";
@@ -120,13 +120,15 @@ export function courseOfferingError(error: unknown): { status: number; error: st
 export async function getGenerationContext(lmsInstanceId: number, userId: number) {
   const user = await prisma.users.findUnique({ where: { id: userId } });
   if (!user) throw new CourseOfferingError(401, "Sign in required.");
+  const config = getCompileConfig();
   // Content generation omits LTI registration/launches.
   const settings = {
     launchUrl: "", resourceSelectionUrl: "", extrtoolLaunchBaseUrl: "",
     canvasContentOnly: true,
-    bookPublicBaseUrl: process.env.BOOKS_PUBLIC_URL || "http://localhost:8080/Books",
-    openDsaSharedDir: process.env.OPENDSA_SHARED_DIR || path.resolve(__dirname, "../../../../.opendsa-shared"),
-    configApiLink: process.env.CONFIG_API_LINK || "http://localhost:8080/api/configure/",
+    bookPublicBaseUrl: config.booksPublicBaseUrl,
+    openDsaSharedDir: config.openDsaSharedDir,
+    configApiLink: config.configApiLink,
+    timeoutMs: config.timeoutMs,
   };
   for (const value of [settings.bookPublicBaseUrl, settings.configApiLink]) {
     try { const url = new URL(value); if (!["http:", "https:"].includes(url.protocol)) throw Error(); }

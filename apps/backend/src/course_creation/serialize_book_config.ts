@@ -5,7 +5,11 @@ import type {
   ModuleCompileConfig,
   SectionCompileConfig,
 } from "./contract";
-import { filterExerciseConfig, filterLearningToolSection } from "./contract";
+import {
+  filterBookOptions,
+  filterExerciseConfig,
+  filterLearningToolSection,
+} from "./contract";
 import type {
   LoadedInstBook,
   LoadedSection,
@@ -67,11 +71,11 @@ export function serializeBookConfig(
 
   const courseOffering = instBook.course_offering;
 
-  // Book options are spread first so a stale option cannot overwrite the
-  // authoritative fields below. course_id/LMS_url are always strings because
-  // the postprocessor concatenates LMS_url without a null check.
+  // Book options are filtered to fields configure.py accepts, then the
+  // authoritative fields below win. course_id/LMS_url are always strings
+  // because the postprocessor concatenates LMS_url without a null check.
   return {
-    ...(parsedBookOptions ?? {}),
+    ...filterBookOptions(parsedBookOptions),
     inst_book_id: instBook.id,
     title: instBook.title,
     desc: instBook.desc,
