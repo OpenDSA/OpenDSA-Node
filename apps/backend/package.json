@@ -7,7 +7,8 @@
     "start": "node dist/index.js",
     "test": "node --import tsx --test tests/*.test.ts",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "lti:register": "tsx scripts/register_lti_platform.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -16,6 +17,7 @@
     "express-rate-limit": "^8.7.2",
     "ims-lti": "^3.0.2",
     "iron-session": "^8.0.4",
+    "ltijs": "^7.0.7",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0"
   },

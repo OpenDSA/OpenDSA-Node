@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import { authSession, initializePassport, restoreUser } from "./auth";
 import { apiRouter } from "./routes";
+import { lti13Router } from "./lti/provider";
 import { trustProxyHops } from "./auth/sessions";
 
 export const app = express();
@@ -18,6 +19,10 @@ app.use(restoreUser);
 
 // API routes
 app.use("/api", apiRouter);
+
+// LTI 1.3 (ltijs): /api/lti13/login_initiations, /api/lti13/launches,
+// /api/lti13/keys, plus the /api/lti13/session debug route.
+app.use(lti13Router);
 
 
 // Basic universal error handler middleware
