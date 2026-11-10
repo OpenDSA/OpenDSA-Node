@@ -16,6 +16,7 @@ function isUniqueConstraintError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
 }
 
+//  savePlatform in Ben's savePlatform method in prisma_database_manager solves the platform identiy (url vs issuer) mismatch. 
 export async function ensureLmsInstance(url: string, lmsTypeName: string) {
   const existing = await prisma.lmsInstances.findFirst({ where: { url } });
   if (existing) return existing;
@@ -61,7 +62,7 @@ export async function ensureUser(context: LtiLaunchContext, lmsInstance: LmsInst
 
   if (!user) {
     // not setting encrypted_password here on purpose - leaving it blank means
-    // this account cant password-login until someone sets a real one later,
+    // this account cant password login until someone sets a real one later,
     // which is what we want for lti-only accounts
     const roleName = context.isInstructor ? "Instructor" : "Regular User";
     const globalRole = await prisma.globalRoles.findFirst({ where: { name: roleName } })

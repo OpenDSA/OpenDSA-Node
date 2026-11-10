@@ -77,7 +77,7 @@ spec:
             - name: opendsa-shared
               mountPath: /mnt/opendsa-shared
           # Only /api/health is wired to probes - a transient DB hiccup
-          # shouldn't crash-loop an otherwise-healthy Express process.
+          # shouldn't crash loop an otherwise-healthy Express process.
           # Check /api/health/db manually (see k8s/README.md) instead.
           readinessProbe:
             httpGet:
@@ -99,7 +99,7 @@ spec:
               cpu: 500m
               memory: 512Mi
         - name: opendsa
-          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:scoping-d60346f
+          image: container.cs.vt.edu/jaden/opendsa-node/opendsa:scoping-634919a
           ports:
             - containerPort: 8080
           volumeMounts:
