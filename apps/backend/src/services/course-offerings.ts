@@ -149,7 +149,7 @@ export async function generateBook(instBookId: number, context: Awaited<ReturnTy
   running.add(instBookId);
   try {
     // Fail before making any Canvas writes when the compiler is offline.
-    const health = await fetch(new URL("/", context.configApiLink), { signal: AbortSignal.timeout(10000) });
+    const health = await fetch(new URL("/healthz", context.configApiLink), { signal: AbortSignal.timeout(10000) });
     if (!health.ok) throw new CourseOfferingError(503, "OpenDSA compiler is not available.");
     return await generateCourse({ ...context, instBookId });
   }
