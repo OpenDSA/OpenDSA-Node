@@ -4,9 +4,8 @@ import type { BookCompileInput } from "./contract";
 import type { OpenDsaCompileResponse } from "./types";
 import { sanitizeFilename } from "./utils";
 
-// ============================================================================
-// OpenDSA Compilation File Writing & Container Trigger
-// ============================================================================
+
+// Writes a config file to the shared directory and triggers the frontend to compile it
 
 export interface WriteBookConfigFileParams {
   userId: number;

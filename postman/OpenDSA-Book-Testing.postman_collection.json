@@ -1,0 +1,536 @@
+{
+  "info": {
+    "_postman_id": "6f4b5c1e-2f7a-4c8e-9d31-7b6a1c0e5d42",
+    "name": "OpenDSA Book Generation & Compilation",
+    "description": "End-to-end checks for OpenDSA-Node book import, simple2full, offering clone, compile-only, and optional Canvas generation.\n\nSelect either the Local Docker or Remote environment, set `password`, then run the folders in order:\n1. Auth\n2. Discovery\n3. Import Simple Config\n4. Create Offering\n5. Compile Only\n6. Verify Compiled Book\n7. Generate Canvas Course (optional; requires a real Canvas token)\n\nCompile-only does not contact Canvas. Generate Canvas Course does, and will fail if the signed-in instructor has no real LmsAccess token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "booksBaseUrl", "value": "http://localhost:8080/Books" },
+    { "key": "openDsaRootUrl", "value": "http://localhost:8080" },
+    { "key": "email", "value": "seed-academic-instructor@example.com" },
+    { "key": "password", "value": "" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "organizationId", "value": "" },
+    { "key": "courseId", "value": "" },
+    { "key": "termId", "value": "" },
+    { "key": "lmsInstanceId", "value": "" },
+    { "key": "textbookLmsInstanceId", "value": "" },
+    { "key": "templateBookId", "value": "" },
+    { "key": "offeringId", "value": "" },
+    { "key": "clonedBookId", "value": "" },
+    { "key": "textbookOfferingId", "value": "" },
+    { "key": "textbookClonedBookId", "value": "" },
+    { "key": "compileBuildPath", "value": "" },
+    { "key": "compileBookUrl", "value": "" },
+    { "key": "generatedBookUrl", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 Health",
+      "item": [
+        {
+          "name": "Backend health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"backend health is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health"
+          }
+        },
+        {
+          "name": "Database health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"database health is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health/db"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "Get CSRF token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"CSRF token returned\", () => pm.expect(body.csrfToken).to.be.a(\"string\"));",
+                  "pm.environment.set(\"csrfToken\", body.csrfToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/csrf"
+          }
+        },
+        {
+          "name": "Login as instructor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"login succeeded\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"csrfToken\", body.csrfToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Current user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"signed in\", () => pm.expect(body.user).to.not.equal(null));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Discovery",
+      "item": [
+        {
+          "name": "Organizations (sets organizationId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"organizations returned\", () => pm.expect(data).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.environment.set(\"organizationId\", data[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/organizations"
+          }
+        },
+        {
+          "name": "Courses (sets courseId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"courses returned\", () => pm.expect(data).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.environment.set(\"courseId\", data[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/courses?organization_id={{organizationId}}"
+          }
+        },
+        {
+          "name": "Terms (sets termId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"terms returned\", () => pm.expect(data).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.environment.set(\"termId\", data[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/terms"
+          }
+        },
+        {
+          "name": "LMS instances (sets lmsInstanceId/textbookLmsInstanceId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"LMS instances returned\", () => pm.expect(data).to.be.an(\"array\"));",
+                  "const normal = data.find(x => !/TEXTBOOK/i.test(x.url));",
+                  "const textbook = data.find(x => /TEXTBOOK/i.test(x.url));",
+                  "if (normal) pm.environment.set(\"lmsInstanceId\", normal.id);",
+                  "if (textbook) pm.environment.set(\"textbookLmsInstanceId\", textbook.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/lms-instances"
+          }
+        },
+        {
+          "name": "Book instances",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"book instances returned\", () => pm.expect(pm.response.json().data).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/book-instances"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Import Simple Config",
+      "item": [
+        {
+          "name": "Import simple config (sets templateBookId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"simple config imported\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"template book id returned\", () => pm.expect(body.data.instBookId).to.be.a(\"number\"));",
+                  "pm.environment.set(\"templateBookId\", body.data.instBookId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"config\": {\n    \"title\": \"Postman Compile Test\",\n    \"desc\": \"simple2full + compile from Postman\",\n    \"lang\": \"en\",\n    \"glob_exer_options\": { \"JXOP-debug\": \"true\" },\n    \"chapters\": {\n      \"Sorting\": {\n        \"Sorting/InsertionSort\": {\n          \"Insertion Sort\": { \"showsection\": true },\n          \"InssortPRO\": { \"points\": 2, \"threshold\": 0.9 }\n        }\n      }\n    }\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/inst_books/import"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Create Offering",
+      "item": [
+        {
+          "name": "Create LMS offering from template (sets offeringId/clonedBookId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"offering created or reused\", () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "pm.environment.set(\"offeringId\", body.data.id);",
+                  "pm.environment.set(\"clonedBookId\", body.data.inst_book_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organization_id\": {{organizationId}},\n  \"course_id\": {{courseId}},\n  \"term_id\": {{termId}},\n  \"label\": \"postman-{{$timestamp}}\",\n  \"lms_instance_id\": {{lmsInstanceId}},\n  \"lms_course_num\": \"postman-{{$timestamp}}\",\n  \"book_instance_id\": {{templateBookId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/course-offerings"
+          }
+        },
+        {
+          "name": "Create textbook offering from template (sets textbook ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"textbook offering created or reused\", () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "pm.environment.set(\"textbookOfferingId\", body.data.id);",
+                  "pm.environment.set(\"textbookClonedBookId\", body.data.inst_book_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organization_id\": {{organizationId}},\n  \"course_id\": {{courseId}},\n  \"term_id\": {{termId}},\n  \"label\": \"postman-textbook-{{$timestamp}}\",\n  \"book_instance_id\": {{templateBookId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/textbooks"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Compile Only",
+      "item": [
+        {
+          "name": "Compile LMS-cloned book (no Canvas)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"compile succeeded\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"compileBuildPath\", body.data.buildPath);",
+                  "pm.environment.set(\"compileBookUrl\", body.data.bookUrl);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extrtoolLaunchBaseUrl\": \"{{baseUrl}}/lti/launch_extrtool\"\n}"
+            },
+            "url": "{{baseUrl}}/api/inst_books/{{clonedBookId}}/compile"
+          }
+        },
+        {
+          "name": "Compile textbook-cloned book (standalone modules)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"textbook compile succeeded\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"compileBuildPath\", body.data.buildPath);",
+                  "pm.environment.set(\"compileBookUrl\", body.data.bookUrl);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extrtoolLaunchBaseUrl\": \"{{baseUrl}}/lti/launch_extrtool\"\n}"
+            },
+            "url": "{{baseUrl}}/api/inst_books/{{textbookClonedBookId}}/compile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Verify Compiled Book",
+      "item": [
+        {
+          "name": "Compiled index",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"compiled index is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{compileBookUrl}}"
+          }
+        },
+        {
+          "name": "Compiled theme CSS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"compiled static CSS is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{openDsaRootUrl}}/Books/{{compileBuildPath}}/html/_static/haiku.css"
+          }
+        },
+        {
+          "name": "OpenDSA library asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"OpenDSA lib asset is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{openDsaRootUrl}}/lib/jquery.min.js"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Generate Canvas Course (optional)",
+      "item": [
+        {
+          "name": "Generate Canvas course (requires real Canvas token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"Canvas generation succeeded\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"generatedBookUrl\", body.data.book_url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/course-offerings/{{offeringId}}/generate"
+          }
+        },
+        {
+          "name": "Verify generated book",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"generated book is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{generatedBookUrl}}"
+          }
+        }
+      ]
+    }
+  ]
+}
