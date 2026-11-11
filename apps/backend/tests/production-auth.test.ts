@@ -58,9 +58,11 @@ test("production auth requires trusted HTTPS, uses secure cookies, and survives 
   try {
     assert.equal((await fetch(server.base + "/api/health")).status, 200);
     assert.equal((await fetch(server.base + "/api/auth/csrf")).status, 400);
+    assert.equal((await fetch(server.base + "/api/auth/signup", { method: "POST" })).status, 400);
     assert.equal((await fetch(server.base + "/api/course-offerings", { method: "POST" })).status, 400);
     assert.equal((await fetch(server.base + "/api/course-offerings", { method: "POST", headers: httpsHeaders })).status, 401);
     assert.equal((await fetch(server.base + "/api/auth/login", { method: "POST", headers: httpsHeaders })).status, 403);
+    assert.equal((await fetch(server.base + "/api/auth/signup", { method: "POST", headers: httpsHeaders })).status, 403);
     const initial = await fetch(server.base + "/api/auth/csrf", { headers: httpsHeaders });
     assert.equal(initial.status, 200);
     assert.match(initial.headers.get("set-cookie")!, /; Secure/i);

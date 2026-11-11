@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { authFetch, useAuth } from "../auth/Auth";
 
 export default function Login() {
@@ -24,13 +24,22 @@ export default function Login() {
   }
   return <div>
     <h1>Sign in</h1>
-    <form onSubmit={login}>
+    <form className="account-form" onSubmit={login}>
       {error && <p role="alert">{error}</p>}
-      <div><label htmlFor="login-email">Email: </label><input id="login-email" type="email" autoComplete="username"
-        required maxLength={255} value={email} onChange={event => setEmail(event.target.value)} /></div>
-      <div><label htmlFor="login-password">Password: </label><input id="login-password" type="password" autoComplete="current-password"
-        required value={password} onChange={event => setPassword(event.target.value)} /></div>
-      <button type="submit" disabled={submitting}>Sign in</button>
+      <div className="account-field">
+        <label htmlFor="login-email">Email<span className="required-mark" aria-hidden="true">*</span>:</label>
+        <input id="login-email" type="email" autoComplete="username" required maxLength={255}
+          value={email} onChange={event => setEmail(event.target.value)} disabled={submitting} />
+      </div>
+      <div className="account-field">
+        <label htmlFor="login-password">Password<span className="required-mark" aria-hidden="true">*</span>:</label>
+        <input id="login-password" type="password" autoComplete="current-password" required
+          value={password} onChange={event => setPassword(event.target.value)} disabled={submitting} />
+      </div>
+      <div className="account-actions">
+        <button type="submit" className="primary-button" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+        <p>Need an account? <Link to="/signup">Sign up</Link></p>
+      </div>
     </form>
   </div>;
 }

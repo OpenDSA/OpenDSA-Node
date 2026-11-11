@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 function Navbar() {
   const { user, logout } = useAuth(); const navigate = useNavigate();
+  const canCreate = user && (user.global_role.can_manage_all_courses || ["Administrator", "Instructor", "Researcher"].includes(user.global_role.name));
   const [error, setError] = useState("");
   async function signOut() {
     try { await logout(); setError(""); navigate("/login"); }
@@ -23,9 +24,11 @@ function Navbar() {
             </button>
             
             <div className="dropdown-menu">
-                {/* <Link to="/courses">Browse All Courses</Link> */} 
-                <Link to="/courses/new">Create New Course</Link>
-                <Link to="/textbooks/new">Create New Textbook</Link>
+                <Link to="/courses">Browse all</Link>
+                {canCreate && <>
+                  <Link to="/courses/new">Create New Course</Link>
+                  <Link to="/textbooks/new">Create New Textbook</Link>
+                </>}
                 </div>
             </div>
 
@@ -58,7 +61,7 @@ function Navbar() {
         </div>
 
         <div className="navbar-right">
-          {user && (
+          {user?.global_role.can_edit_system_configuration && (
             <Link 
               to="/admin" 
               className="admin-link"
@@ -67,8 +70,8 @@ function Navbar() {
             🔧
             </Link>
           )}
-            {user ? <><span>{user.first_name || user.email}</span><button type="button" onClick={signOut}>Sign out</button></>
-              : <Link to="/login">Sign in</Link>}
+            {user ? <><Link to="/profile">{user.first_name || user.email}</Link><button type="button" onClick={signOut}>Sign out</button></>
+              : <><Link to="/signup">Sign up</Link><Link to="/login">Sign in</Link></>}
             {error && <span role="alert">{error}</span>}
       </div>
     </nav>

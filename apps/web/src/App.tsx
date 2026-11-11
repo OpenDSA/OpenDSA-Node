@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider, RequireAuth } from "./auth/Auth";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -39,6 +41,8 @@ function App() {
       <main>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<BrowseCourses />} />
           <Route path="/courses/new" element={<RequireAuth instructor><CreateCourse /></RequireAuth>} />
