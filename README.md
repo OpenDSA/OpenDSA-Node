@@ -22,11 +22,22 @@ deployment:
   `config/temp/<file>.json` to `/mnt/opendsa-shared`, and that same directory
   is mounted at `/opendsa/config/temp` for the compiler. The directory is
   gitignored and safe to delete.
-- `opendsa` is published on `:8080`, which stands in for the `/Books` Ingress
-  path. Compiled books are written to
+- `opendsa` is published on `:8080` for direct compiler/static access.
+  It uses the same scoped Flask app as the k8s image
+  (`k8s/opendsa/app.py` bind-mounted over the upstream `app.py`), so
+  `/healthz`, `/api/configure/`, `/api/simple2full/`, and the static-serving
+  rules match production.
+- The Vite dev server on `:5173` is the local equivalent of the k8s ingress.
+  It proxies `/api` to the backend and `/Books`, `/lib`, `/AV`,
+  `/DataStructures`, `/Exercises`, `/khan-exercises`, and
+  `/Metadata/inlineav` to opendsa. Use `http://localhost:5173` as the public
+  origin for local LTI launch/keyset URLs and for `BOOKS_PUBLIC_URL`; this
+  keeps the LTI redirect to `/Books/...` and all book assets on one origin.
+- Compiled books are written to
   `../OpenDSA-DevStack/opendsa/Books/<org>/<course>/<term>/<label>/` on the
-  host and served at `http://localhost:8080/Books/...` (or through the Vite
-  dev server at `http://localhost:5173/Books/...`, which proxies there).
+  host. They can be viewed through the Vite origin
+  (`http://localhost:5173/Books/...`) or directly against the opendsa
+  container (`http://localhost:8080/Books/...`).
 - Unlike k8s, `CONFIG_API_LINK` points at `http://opendsa:8080/...` instead of
   `localhost`, because the compiler is a separate container here rather than a
   sidecar in the backend Pod.

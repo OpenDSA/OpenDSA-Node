@@ -26,9 +26,28 @@ services:
       # here it is a separate container, so use the compose service name.
       - OPENDSA_SHARED_DIR=/mnt/opendsa-shared
       - CONFIG_API_LINK=http://opendsa:8080/api/configure/
+      # The Vite dev server on :5173 is the local equivalent of the k8s
+      # ingress: it proxies /api to the backend and the book/static paths
+      # to opendsa. Use :5173 as the public origin for local LTI URLs and
+      # generated book links.
+      - BOOKS_PUBLIC_URL=http://localhost:5173/Books
     depends_on:
-      - mysql
-      - opendsa
+      mysql:
+        condition: service_healthy
+      opendsa:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
 
   web:
     build:
@@ -46,6 +65,11 @@ services:
       - NODE_ENV=development
       - API_PROXY_TARGET=http://backend:3000
       - BOOKS_PROXY_TARGET=http://opendsa:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+      opendsa:
+        condition: service_healthy
 
   # OpenDSA book compiler/serving container. Same runtime as the k8s image
   # built from k8s/opendsa/Dockerfile.discovery (that is Dockerfile.server
@@ -62,12 +86,15 @@ services:
       - "8080:8080"
     volumes:
       - ${OPENDSA_SRC:-../OpenDSA-DevStack/opendsa}:/opendsa
+      # Use the same scoped Flask app as the k8s image so local serving and
+      # /healthz match production. This overrides the upstream app.py.
+      - ./k8s/opendsa/app.py:/opendsa/app.py:ro
       # Equivalent of the sidecar's subPath mount: only config/temp is
       # shared with the backend, so opendsa's prebuilt config/*.json
       # templates (and the rest of config/) stay visible.
       - ./.opendsa-shared/config/temp:/opendsa/config/temp
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/healthz"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -82,6 +109,11 @@ services:
     volumes:
       # Persists database data across container restarts
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-psecret"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   mysql_data:
