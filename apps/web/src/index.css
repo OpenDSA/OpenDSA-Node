@@ -246,6 +246,20 @@ button {
   margin: 0 auto;
 }
 
+.account-form {
+  max-width: 750px;
+}
+
+.required-mark {
+  color: #b33;
+  margin-left: 2px;
+}
+
+.account-actions {
+  margin-left: 180px;
+  margin-top: 20px;
+}
+
 .textbook-container a {
   color: #269bb3;
   text-decoration: none;
@@ -260,7 +274,8 @@ button {
   font-weight: bold;
 }
 
-.textbook-field {
+.textbook-field,
+.account-field {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
   gap: 20px;
@@ -268,13 +283,16 @@ button {
   margin-bottom: 15px;
 }
 
-.textbook-field label {
+.textbook-field label,
+.account-field label {
   text-align: right;
   padding-top: 10px;
 }
 
 .textbook-field input,
-.textbook-field select {
+.textbook-field select,
+.account-field input,
+.account-field select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ccc;
@@ -299,16 +317,19 @@ button {
     margin: 0;
   }
 
-  .textbook-field {
+  .textbook-field,
+  .account-field {
     grid-template-columns: 1fr;
     gap: 5px;
   }
 
-  .textbook-field label {
+  .textbook-field label,
+  .account-field label {
     text-align: left;
   }
 
-  .textbook-submit {
+  .textbook-submit,
+  .account-actions {
     margin-left: 0;
   }
 }

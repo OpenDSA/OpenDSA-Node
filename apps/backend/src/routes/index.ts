@@ -6,6 +6,8 @@ import { generateCourseRouter } from "../course_creation";
 import { courseOfferingsRouter } from "./course-offerings";
 import { courseOptionsRouter } from "./course-options";
 import { instBooksRouter } from "./inst-books";
+import { profileRouter } from "./profile";
+import { adminRouter } from "./admin";
 import { ltiRouter } from "../lti/router";
 
 export const apiRouter = Router();
@@ -26,6 +28,8 @@ apiRouter.get("/health/db", async (_req, res) => {
 
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/profile", profileRouter);
+apiRouter.use("/admin", adminRouter);
 
 // Add router files for each endpoint group here.
 apiRouter.use(courseOptionsRouter);

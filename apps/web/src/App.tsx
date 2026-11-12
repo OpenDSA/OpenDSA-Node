@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider, RequireAuth } from "./auth/Auth";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -19,7 +21,7 @@ import Official from "./pages/Official";
 import Contact from "./pages/Contact";
 import License from "./pages/License";
 import CreateTextbook from "./pages/CreateTextbook";
-import AdminDashboard from "./pages/AdminDashboard";
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
       <main>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<BrowseCourses />} />
           <Route path="/courses/new" element={<RequireAuth instructor><CreateCourse /></RequireAuth>} />
@@ -50,7 +54,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/license" element={<License />} />
           <Route path="/textbooks/new" element={<RequireAuth instructor><CreateTextbook /></RequireAuth>} />
-          <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
+          <Route path="/admin/*" element={<RequireAuth administrator><Suspense fallback={<p>Loading administration…</p>}><AdminDashboard /></Suspense></RequireAuth>} />
 
           <Route
             path="/documentation"
