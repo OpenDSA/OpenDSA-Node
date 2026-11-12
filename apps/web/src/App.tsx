@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider, RequireAuth } from "./auth/Auth";
@@ -21,7 +21,7 @@ import Official from "./pages/Official";
 import Contact from "./pages/Contact";
 import License from "./pages/License";
 import CreateTextbook from "./pages/CreateTextbook";
-import AdminDashboard from "./pages/AdminDashboard";
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 
 function App() {
@@ -54,7 +54,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/license" element={<License />} />
           <Route path="/textbooks/new" element={<RequireAuth instructor><CreateTextbook /></RequireAuth>} />
-          <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
+          <Route path="/admin/*" element={<RequireAuth administrator><Suspense fallback={<p>Loading administration…</p>}><AdminDashboard /></Suspense></RequireAuth>} />
 
           <Route
             path="/documentation"

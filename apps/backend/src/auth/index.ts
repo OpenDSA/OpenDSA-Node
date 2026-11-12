@@ -72,6 +72,12 @@ export const requireInstructor: RequestHandler = (req, res, next) => {
   if (!req.user || !canCreateOfferings(req.user)) { res.status(403).json({ error: "Instructor access required." }); return; }
   next();
 };
+export const requireAdministrator: RequestHandler = (req, res, next) => {
+  if (!req.user || !(req.user.global_role.name === "Administrator" || req.user.global_role.can_edit_system_configuration)) {
+    res.status(403).json({ error: "Administrator access required." }); return;
+  }
+  next();
+};
 export async function canManageOffering(user: Express.User, offeringId: number) {
   if (user.global_role.can_manage_all_courses) return true;
   return !!await prisma.courseEnrollments.findFirst({ where: {

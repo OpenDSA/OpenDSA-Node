@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../auth/Auth";
+import { canAccessAdmin, useAuth } from "../auth/Auth";
 import { Link, useNavigate } from "react-router-dom";
 
 function Navbar() {
@@ -61,7 +61,7 @@ function Navbar() {
         </div>
 
         <div className="navbar-right">
-          {user?.global_role.can_edit_system_configuration && (
+          {canAccessAdmin(user) && (
             <Link 
               to="/admin" 
               className="admin-link"
