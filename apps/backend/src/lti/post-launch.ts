@@ -78,7 +78,7 @@ export async function ensureUser(context: LtiLaunchContext, lmsInstance: LmsInst
     try {
       user = await prisma.users.create({
         data: {
-          email,
+          email, created_at: new Date(), updated_at: new Date(),
           slug: makeUserSlug(email),
           first_name: context.firstName,
           last_name: context.lastName,
@@ -94,7 +94,7 @@ export async function ensureUser(context: LtiLaunchContext, lmsInstance: LmsInst
   } else if (user.first_name !== context.firstName || user.last_name !== context.lastName) {
     user = await prisma.users.update({
       where: { id: user.id },
-      data: { first_name: context.firstName, last_name: context.lastName },
+      data: { first_name: context.firstName, last_name: context.lastName, updated_at: new Date() },
       include: { global_role: true },
     });
   }

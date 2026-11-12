@@ -92,6 +92,8 @@ const roleSelect = {
 const userSelect = {
   id: true, email: true, first_name: true, last_name: true, global_role_id: true,
   time_zone_id: true, created_at: true, updated_at: true,
+  sign_in_count: true, current_sign_in_at: true, last_sign_in_at: true,
+  current_sign_in_ip: true, last_sign_in_ip: true,
   global_role: { select: roleSelect },
 } as const;
 const bookSelect = {
@@ -115,7 +117,7 @@ adminRouter.get("/books", async (req, res) => {
 });
 
 adminRouter.get("/users", async (req, res) => {
-  const options = listOptions(req, ["id", "email", "first_name", "last_name", "created_at"], "email");
+  const options = listOptions(req, ["id", "email", "first_name", "last_name", "created_at", "updated_at", "current_sign_in_at", "last_sign_in_at", "sign_in_count"], "email");
   if (!options) { res.status(400).json({ error: "Invalid list parameters." }); return; }
   const { q, ...paging } = options;
   const where = q ? { OR: [{ email: { contains: q } }, { first_name: { contains: q } }, { last_name: { contains: q } }] } : {};

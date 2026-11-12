@@ -1,5 +1,5 @@
 import {
-  Admin, Resource, List, Datagrid, TextField, DateField, Show,
+  Admin, Resource, List, Datagrid, TextField, NumberField, DateField, Show,
   BooleanField, SimpleShowLayout, Menu, Notification, HttpError,
   Edit, SimpleForm, TextInput, ReferenceInput, SelectInput, Toolbar, SaveButton,
   EditButton, required, email, maxLength, useNotify, useRedirect,
@@ -143,7 +143,8 @@ function UsersList() {
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="email" /><TextField source="first_name" />
       <TextField source="last_name" /><TextField source="global_role.name" label="Role" sortable={false} />
-      <DateField source="created_at" /><EditButton />
+      <DateField source="created_at" showTime /><DateField source="current_sign_in_at" label="Latest sign-in" showTime />
+      <NumberField source="sign_in_count" /><EditButton />
     </Datagrid>
   </List>;
 }
@@ -152,7 +153,12 @@ function UserShow() {
     <TextField source="id" /><TextField source="email" /><TextField source="first_name" />
     <TextField source="last_name" /><TextField source="global_role.name" label="Role" />
     <TextField source="global_role_id" /><TextField source="time_zone_id" />
-    <DateField source="created_at" /><DateField source="updated_at" />
+    <DateField source="created_at" showTime /><DateField source="updated_at" showTime />
+    <NumberField source="sign_in_count" />
+    <DateField source="current_sign_in_at" label="Latest sign-in" showTime />
+    <DateField source="last_sign_in_at" label="Previous sign-in" showTime />
+    <TextField source="current_sign_in_ip" label="Latest sign-in IP" />
+    <TextField source="last_sign_in_ip" label="Previous sign-in IP" />
   </SimpleShowLayout></Show>;
 }
 function UserEdit() {

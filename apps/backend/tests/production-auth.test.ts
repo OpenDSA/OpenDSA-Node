@@ -20,6 +20,7 @@ async function start(proxyHops = "1") {
       const user = { id: 42, email: "instructor@example.com", first_name: "Test", last_name: "Instructor",
         global_role: { name: "Instructor", can_manage_all_courses: false, can_edit_system_configuration: false } };
       const password = await hashPassword("Test-password");
+      prisma.$executeRaw = async () => 1;
       prisma.users.findUnique = async args => args.where.id === 42 || args.where.email === user.email
         ? args.select.encrypted_password ? { ...user, encrypted_password: password } : user : null;
       const { app } = require(${JSON.stringify(appModule)});

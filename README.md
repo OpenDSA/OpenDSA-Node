@@ -172,3 +172,11 @@ Terms, Courses, Course Offerings, Books, Users, and Global Roles from the databa
 screens and their `/api/admin` endpoints require administrator access and are
 read-only except Users: administrators can edit names, email, and assigned global
 role. User deletion, role-definition editing, and activity reports are not included yet.
+
+User login tracking follows Devise's current/previous convention: successful
+password logins, automatic signup login, and verified LTI sign-ins increment
+`sign_in_count` and rotate `current_sign_in_at`/`last_sign_in_at` and their IPs.
+On the first login both timestamps match. The admin Users screen displays these
+metrics; failed logins and session restoration do not update them. New signup
+and LTI accounts receive creation/update timestamps; missing historical dates
+are not backfilled.

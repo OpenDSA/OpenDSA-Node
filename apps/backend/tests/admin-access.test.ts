@@ -31,7 +31,7 @@ test("admin namespace denies non-administrators and rechecks role changes on eve
       const checkSafe = (value: unknown) => {
         if (!value || typeof value !== "object") return;
         for (const [key, child] of Object.entries(value)) {
-          assert.ok(!/password|token|secret|api_key|options|sign_in_ip/.test(key), `Sensitive field exposed: ${key}`);
+          assert.ok(!/password|token|secret|api_key|options/.test(key), `Sensitive field exposed: ${key}`);
           checkSafe(child);
         }
       };

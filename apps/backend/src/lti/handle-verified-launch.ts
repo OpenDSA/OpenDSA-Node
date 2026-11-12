@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import { recordSignIn } from "../auth/sign-in-metrics";
 import { prisma } from "../db";
 import { sessionLifetimeSeconds } from "../auth/sessions";
 import { buildBookOutputPath } from "../course_creation/utils";
@@ -54,6 +55,7 @@ export async function handleVerifiedLaunch(
     context.lmsTypeName
   );
   const user = await ensureUser(context, lmsInstance);
+  await recordSignIn(user.id, req);
 
   // Matches the existing 1.1 launch: passport only attaches req.user here;
   // the iron-session is what actually persists the login across requests.
