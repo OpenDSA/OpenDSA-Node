@@ -171,7 +171,9 @@ The administrator dashboard at `/admin` uses React-admin to browse Organizations
 Terms, Courses, Course Offerings, Books, Users, and Global Roles from the database, with sorting, pagination, and record details. These
 screens and their `/api/admin` endpoints require administrator access and are
 read-only except Users: administrators can edit names, email, and assigned global
-role. User deletion, role-definition editing, and activity reports are not included yet.
+role. Its homepage shows the 20 latest sign-ins and the current term’s offerings
+with their first instructor. As in Rails, it falls back to the earliest term when
+none is active. User deletion, role-definition editing, and error reports remain deferred.
 
 User login tracking follows Devise's current/previous convention: successful
 password logins, automatic signup login, and verified LTI sign-ins increment

@@ -5,6 +5,7 @@ import {
   EditButton, required, email, maxLength, useNotify, useRedirect,
   type DataProvider, type LayoutProps,
 } from "react-admin";
+import AdminHome from "./AdminHome";
 import { authFetch, useAuth } from "../auth/Auth";
 
 // Explicit resources and fields keep credentials out of the admin interface.
@@ -196,7 +197,7 @@ function RoleShow() {
 }
 export default function AdminDashboard() {
   // The surrounding RequireAuth and every /api/admin endpoint enforce administrator access.
-  return <Admin basename="/admin" dataProvider={dataProvider} layout={AdminLayout}
+  return <Admin basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={AdminHome}
     disableTelemetry title="OpenDSA Administration">
     <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} />
     <Resource name="terms" list={TermsList} show={TermShow} />

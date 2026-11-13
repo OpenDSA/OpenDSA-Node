@@ -23,6 +23,34 @@ function listOptions(req: Request, fields: string[], defaultSort: string) {
 const organizationSelect = { id: true, name: true, abbreviation: true, slug: true, created_at: true } as const;
 const termSelect = { id: true, season: true, year: true, starts_on: true, ends_on: true, slug: true } as const;
 
+// Match Rails Term.current_term: earliest active term, otherwise earliest term.
+adminRouter.get("/dashboard", async (_req, res) => {
+  const now = new Date();
+  const orderBy = [{ starts_on: "asc" as const }, { id: "asc" as const }];
+  const currentTerm = await prisma.terms.findFirst({
+    where: { starts_on: { lte: now }, ends_on: { gt: now } }, orderBy, select: termSelect,
+  });
+  const term = currentTerm ?? await prisma.terms.findFirst({ orderBy, select: termSelect });
+  const [recentUsers, offerings] = await Promise.all([
+    prisma.users.findMany({
+      where: { current_sign_in_at: { not: null } },
+      orderBy: [{ current_sign_in_at: "desc" }, { id: "desc" }], take: 20,
+      select: { id: true, first_name: true, last_name: true, email: true,
+        current_sign_in_at: true, current_sign_in_ip: true },
+    }),
+    term ? prisma.courseOfferings.findMany({ where: { term_id: term.id }, orderBy: { id: "asc" },
+      select: { id: true, label: true, archived: true,
+        course: { select: { id: true, name: true, number: true } },
+        course_enrollments: { where: { course_role: { name: "Instructor" } }, orderBy: { id: "asc" }, take: 1,
+          select: { user: { select: { id: true, first_name: true, last_name: true, email: true } } } },
+      },
+    }) : Promise.resolve([]),
+  ]);
+  res.json({ term, termIsCurrent: currentTerm !== null, recentUsers,
+    offerings: offerings.map(({ course_enrollments, ...offering }) => ({ ...offering,
+      instructor: course_enrollments[0]?.user ?? null })) });
+});
+
 adminRouter.get("/organizations", async (req, res) => {
   const options = listOptions(req, ["id", "name", "abbreviation", "created_at"], "name");
   if (!options) { res.status(400).json({ error: "Invalid list parameters." }); return; }
