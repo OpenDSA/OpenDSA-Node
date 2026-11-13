@@ -15,6 +15,7 @@ function fakeRequest() {
 
   return {
     req: {
+      ip: "127.0.0.1",
       logIn: (
         _user: unknown,
         _options: unknown,
@@ -73,6 +74,9 @@ test("shared post-launch resolves the book, user, session, and redirect", async 
     );
 
     const user = await prisma.users.findUniqueOrThrow({ where: { email } });
+    assert.equal(user.sign_in_count, 1);
+    assert.ok(user.created_at); assert.ok(user.current_sign_in_at);
+    assert.equal(user.current_sign_in_ip, "127.0.0.1");
     assert.equal(session.userId, user.id);
     assert.equal(session.lisOutcomeServiceUrl, "https://canvas.example/lineitems/1");
     assert.equal(session.lisResultSourcedid, "sub-123");

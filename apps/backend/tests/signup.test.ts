@@ -22,6 +22,7 @@ test("signup validates, creates only regular users, signs in, handles duplicates
   const transaction = prisma.$transaction;
   const lookup = prisma.users.findUnique;
   const create = prisma.users.create;
+  const executeRaw = prisma.$executeRaw;
   const roleLookup = prisma.globalRoles.findFirst;
   const before = await prisma.users.count();
   const sentinel = new Error("Rollback signup fixtures");
@@ -44,6 +45,7 @@ test("signup validates, creates only regular users, signs in, handles duplicates
       // Route requests exercise real constraints/hashes but leave no test accounts.
       prisma.users.findUnique = ((args: any) => tx.users.findUnique(args)) as any;
       prisma.users.create = ((args: any) => tx.users.create(args)) as any;
+      prisma.$executeRaw = tx.$executeRaw.bind(tx);
       const response = await signup({ ...input, email: ` ${input.email.toUpperCase()} ` }, anonymous);
       assert.equal(response.status, 201);
       const body = await response.json();
@@ -92,6 +94,7 @@ test("signup validates, creates only regular users, signs in, handles duplicates
   } finally {
     prisma.users.findUnique = lookup;
     prisma.users.create = create;
+    prisma.$executeRaw = executeRaw;
     prisma.globalRoles.findFirst = roleLookup;
     await new Promise<void>(resolve => server.close(() => resolve()));
     assert.equal(await prisma.users.count(), before);

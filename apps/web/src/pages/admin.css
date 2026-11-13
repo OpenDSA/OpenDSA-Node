@@ -1,0 +1,53 @@
+/* Scoped to the admin area; instructor-facing pages keep their existing theme. */
+main:has(.admin-shell) {
+  padding: 0;
+  background: #f4f6f8;
+  color: #202b36;
+}
+.admin-shell { min-height: calc(100vh - 120px); color-scheme: light; font: 15px/1.5 Arial, Helvetica, sans-serif; }
+.admin-navigation {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 12px 24px; background: #344251; color: #fff;
+}
+.admin-navigation a, .admin-nav-group > button {
+  display: block; padding: 8px 12px; border-radius: 5px;
+  color: #fff; text-decoration: none; cursor: pointer; font-weight: 600;
+}
+.admin-navigation a:hover, .admin-nav-group > button:hover,
+.admin-navigation a.active { background: #52677c; color: #fff; }
+.admin-navigation a:focus-visible, .admin-nav-group > button:focus-visible { outline: 3px solid #88caff; outline-offset: 2px; }
+.admin-navigation .admin-back { margin-right: 12px; }
+.admin-nav-group { position: relative; }
+
+.admin-nav-group > button { border: 0; }
+.admin-nav-group > div[hidden] { display: none; }
+.admin-nav-group > div {
+  position: absolute; top: 100%; left: 0; z-index: 20; min-width: 220px;
+  padding: 6px; background: #344251; border-radius: 5px; box-shadow: 0 5px 14px #0003;
+}
+.admin-content { padding: 24px; min-width: 0; }
+.admin-dashboard { padding: 0; color: #202b36; }
+.admin-dashboard h1 { color: #263746; margin: 0 0 24px; font-size: 30px; line-height: 1.25; }
+.admin-home-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.admin-home-left { min-width: 0; }
+.admin-panel { min-width: 0; margin: 0 0 24px; border: 1px solid #cbd3dc; border-radius: 6px; background: #fff; overflow: hidden; }
+.admin-dashboard .admin-panel h2 { margin: 0; padding: 12px 16px; background: #e8edf2; color: #263746; font-size: 16px; font-weight: 700; border-bottom: 1px solid #cbd3dc; }
+.admin-panel p { margin: 16px; color: #4b5968; }
+.admin-dashboard table { width: 100%; table-layout: fixed; margin: 0; border-collapse: collapse; background: #fff; color: #202b36; font-size: 14px; }
+.admin-dashboard th, .admin-dashboard td { padding: 12px; text-align: left; vertical-align: top; overflow-wrap: anywhere; border-bottom: 1px solid #dce2e8; color: #202b36; }
+.admin-dashboard th { background: #f3f5f7; color: #354557; font-weight: 700; }
+.admin-dashboard tbody tr:nth-child(even) { background: #f5f7fa; }
+.admin-dashboard tbody tr:hover { background: #eaf2f9; }
+.admin-dashboard a, .admin-dashboard a:visited { color: #175c91; text-decoration: underline; text-underline-offset: 2px; }
+.admin-dashboard a:hover { color: #103f64; }
+@media (max-width: 1000px) { .admin-home-columns { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .admin-content { padding: 14px; }
+  .admin-navigation { padding: 10px; gap: 2px; }
+  .admin-navigation a, .admin-nav-group > button { padding: 8px; }
+  .admin-dashboard h1 { font-size: 25px; }
+  .admin-dashboard th, .admin-dashboard td { padding: 8px; font-size: 12px; }
+}
+.admin-navigation .admin-user { margin-left: auto; }
+.admin-navigation button { font: inherit; font-weight: 600; padding: 8px 12px; color: #fff; background: transparent; border: 1px solid #8b9aab; border-radius: 5px; }
+.admin-navigation button:hover { background: #52677c; }

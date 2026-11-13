@@ -169,6 +169,24 @@ Sign up at `/signup`; successful signup opens `/profile` to edit first name, las
 
 The administrator dashboard at `/admin` uses React-admin to browse Organizations,
 Terms, Courses, Course Offerings, Books, Users, and Global Roles from the database, with sorting, pagination, and record details. These
-screens and their `/api/admin` endpoints require administrator access and are
-read-only except Users: administrators can edit names, email, and assigned global
-role. User deletion, role-definition editing, and activity reports are not included yet.
+screens and their `/api/admin` endpoints require administrator access. Administrators
+can create/edit Organizations, Terms, Courses, Course Offerings, Course Roles,
+Late Policies, LMS Types, and LMS Instances, and edit users’ names, email, and assigned global
+role. Offering creation enrolls the creator as instructor; offering edits clear
+linked books’ compilation timestamps. These saves do not compile or call Canvas.
+LMS Instance forms support LTI settings and generate RSA keys for new LTI 1.3
+configurations. Shared secrets/private keys are write-only; blank values on edit
+preserve stored credentials. Built-in
+course-role names can change, but their permission flags cannot. Enrollment uses
+Node’s existing stable IDs (Instructor 1, Student 2); the seed preserves renamed
+roles. These differ from Rails’ IDs and must be mapped during migration. Its homepage shows the 20 latest sign-ins and the current term’s offerings
+with their first instructor. As in Rails, it falls back to the earliest term when
+none is active. User deletion, role-definition editing, and error reports remain deferred.
+
+User login tracking follows Devise's current/previous convention: successful
+password logins, automatic signup login, and verified LTI sign-ins increment
+`sign_in_count` and rotate `current_sign_in_at`/`last_sign_in_at` and their IPs.
+On the first login both timestamps match. The admin Users screen displays these
+metrics; failed logins and session restoration do not update them. New signup
+and LTI accounts receive creation/update timestamps; missing historical dates
+are not backfilled.

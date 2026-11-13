@@ -3,6 +3,7 @@ import { Request, RequestHandler, Router } from "express";
 import { Prisma } from "@prisma/client";
 import passport from "passport";
 import { Strategy } from "passport-local";
+import { recordSignIn } from "./sign-in-metrics";
 import { hashPassword, verifyPassword } from "./passwords";
 import { rateLimit } from "express-rate-limit";
 import { prisma } from "../db";
@@ -16,6 +17,7 @@ type AuthUser = NonNullable<Awaited<ReturnType<typeof loadUser>>>;
 function loadUser(id: number) { return prisma.users.findUnique({ where: { id }, select: authUserSelect }); }
 
 async function signIn(req: Request, user: AuthUser) {
+  await recordSignIn(user.id, req);
   await new Promise<void>((resolve, reject) => {
     req.logIn(user, { session: false }, error => error ? reject(error) : resolve());
   });
