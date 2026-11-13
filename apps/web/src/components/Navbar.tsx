@@ -72,7 +72,7 @@ function Navbar() {
             🔧
             </Link>
           )}
-            {user ? <><Link to="/profile">{user.first_name || user.email}</Link><button type="button" onClick={signOut}>Sign out</button></>
+            {user ? <><Link to="/profile">{user.first_name || user.email}</Link><button type="button" className="navbar-signout" onClick={signOut}>Sign out</button></>
               : <><Link to="/signup">Sign up</Link><Link to="/login">Sign in</Link></>}
             {error && <span role="alert">{error}</span>}
       </div>

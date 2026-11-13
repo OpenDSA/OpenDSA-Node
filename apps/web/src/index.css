@@ -28,7 +28,7 @@ body {
 }
 
 .navbar a,
-.navbar button
+.navbar button,
 .navbar-right span {
   color: white;
   text-decoration: none;
@@ -370,4 +370,19 @@ button {
 
 .admin-dashboard tr:nth-child(even) {
   background-color: #eeeeee;
+}
+
+/* styling for the sign out button in the navigation bar */
+.navbar-signout {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+/* changes the text color when hovering over sign out */
+.navbar-signout:hover {
+  color: #36a4bb;
 }

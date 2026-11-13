@@ -1,10 +1,10 @@
 import { apiFetch } from "../auth/api";
 import {
-  Admin, Resource, List, Datagrid, TextField, NumberField, DateField, Show,
+  Admin, Resource, Datagrid, TextField, NumberField, DateField, Show,
   BooleanField, SelectField, SimpleShowLayout, Notification, HttpError,
   Edit, SimpleForm, TextInput, ReferenceInput, SelectInput, Toolbar, SaveButton,
   EditButton, required, email, maxLength, useNotify, useRedirect,
-  type DataProvider, type LayoutProps,
+  type DataProvider, type LayoutProps, type RaRecord, type DeleteParams, type DeleteResult,
 } from "react-admin";
 import { useState, type ReactNode } from "react";
 import { AdminCreate, AdminEdit, seasons } from "./AdminForms";
@@ -12,15 +12,35 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./admin.css";
 import AdminHome from "./AdminHome";
 import { authFetch, useAuth } from "../auth/Auth";
+import { AdminList, AdminPageHeader } from "./AdminListTools";
+import { adminFeatures } from "./adminFeatures";
+import { LmsAccessesList, LmsAccessShow, LmsAccessEdit, LmsAccessCreate } from "./AdminLmsAccesses";
+import { ErrorsList, ErrorShow } from "./AdminErrors";
 
+// Write-only credentials: dropped from every response before react-admin caches it,
+// even if an endpoint returns them by mistake.
+const writeOnlyFields: Record<string, string[]> = { "lms-accesses": ["access_token", "consumer_secret"] };
+function withoutSecrets<T>(resource: string, body: T): T {
+  const hidden = writeOnlyFields[resource];
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!hidden || !data) return body;
+  const strip = (record: unknown) => record && typeof record === "object"
+    ? Object.fromEntries(Object.entries(record).filter(([key]) => !hidden.includes(key))) : record;
+  return { ...body, data: Array.isArray(data) ? data.map(strip) : strip(data) } as T;
+}
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
-  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances"].includes(resource)) throw new Error("Unknown resource.");
+  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "errors"].includes(resource)) throw new Error("Unknown resource.");
   const response = await apiFetch(`/api/admin/${resource}${suffix}`);
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Request failed.", response.status, body);
-  return body;
+  return withoutSecrets(resource, body);
 }
+// Field filters beyond `q`; existing endpoints reject unknown query parameters, so these are per resource.
+const listFilters: Record<string, string[]> = {
+  "lms-accesses": ["email", "lms_instance_id", "user_id"],
+  errors: ["class_name", "message", "created_from", "created_to"],
+};
 const editableFields: Record<string, string[]> = {
   users: ["first_name", "last_name", "email", "global_role_id"],
   organizations: ["name", "abbreviation"], terms: ["season", "year", "starts_on", "ends_on"],
@@ -30,19 +50,30 @@ const editableFields: Record<string, string[]> = {
   "late-policies": ["name", "late_days", "late_percent"], "lms-types": ["name"],
   "lms-instances": ["url", "lms_type_id", "organization_id", "consumer_key", "consumer_secret", "client_id",
     "private_key", "public_key", "keyset_url", "oauth2_url", "platform_oidc_auth_url", "issuer"],
+  "lms-accesses": ["lms_instance_id", "user_id", "access_token", "consumer_key", "consumer_secret"],
 };
 async function write(resource: string, data: Record<string, unknown>, id?: string | number) {
   if (!editableFields[resource] || (resource === "users" && id === undefined)) throw new Error("This operation is not supported.");
-  const input = Object.fromEntries(editableFields[resource].filter(key => key in data).map(key =>
+  // A blank write-only credential means "keep the current value", so it is not sent.
+  const input = Object.fromEntries(editableFields[resource].filter(key => key in data &&
+    !(writeOnlyFields[resource]?.includes(key) && (data[key] == null || data[key] === ""))).map(key =>
     [key, ["starts_on", "ends_on"].includes(key) && typeof data[key] === "string" ? data[key].slice(0, 10) : data[key]]));
   const response = await authFetch(`/api/admin/${resource}${id === undefined ? "" : `/${encodeURIComponent(id)}`}`, {
     method: id === undefined ? "POST" : "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
   });
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Unable to save record.", response.status, body);
-  return body;
+  return withoutSecrets(resource, body);
 }
 const unsupported = async (): Promise<never> => { throw new Error("This operation is not supported."); };
+// Only LMS accesses can be deleted, and only once the backend endpoint exists.
+async function remove<RecordType extends RaRecord>(resource: string, params: DeleteParams<RecordType>): Promise<DeleteResult<RecordType>> {
+  if (resource !== "lms-accesses" || !adminFeatures.lmsAccessDelete) return unsupported();
+  const response = await authFetch(`/api/admin/${resource}/${encodeURIComponent(params.id)}`, { method: "DELETE" });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new HttpError(body.error || "Unable to delete record.", response.status, body);
+  return { data: (params.previousData ?? { id: params.id }) as RecordType };
+}
 const dataProvider: DataProvider = {
   getList: (resource, params) => {
     const query = new URLSearchParams({
@@ -50,6 +81,10 @@ const dataProvider: DataProvider = {
       sort: params.sort?.field ?? "id", order: params.sort?.order ?? "ASC",
       q: params.filter?.q ?? "",
     });
+    for (const key of listFilters[resource] ?? []) {
+      const value = params.filter?.[key];
+      if (value != null && String(value).trim() !== "") query.set(key, String(value).trim());
+    }
     return read(resource, `?${query}`);
   },
   getOne: (resource, params) => read(resource, `/${encodeURIComponent(params.id)}`),
@@ -60,7 +95,7 @@ const dataProvider: DataProvider = {
   create: (resource, params) => write(resource, params.data),
   update: (resource, params) => write(resource, params.data, params.id),
   updateMany: unsupported,
-  delete: unsupported, deleteMany: unsupported,
+  delete: remove, deleteMany: unsupported,
 };
 function AdminDropdown({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -92,25 +127,30 @@ function AdminLayout({ children }: LayoutProps) {
       <AdminDropdown label="LMS Config">
         <NavLink to="/admin/lms-types">LMS Types</NavLink>
         <NavLink to="/admin/lms-instances">LMS Instances</NavLink>
+        {adminFeatures.lmsAccesses && <NavLink to="/admin/lms-accesses">LMS Accesses</NavLink>}
       </AdminDropdown>
-      <NavLink to="/admin/books">OpenDSA Books</NavLink>
+      <AdminDropdown label="OpenDSA Books">
+        <NavLink to="/admin/books">Book Instances</NavLink>
+      </AdminDropdown>
       <NavLink to="/admin/users">Users</NavLink>
+      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}
       <Link to="/profile" className="admin-user">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email}</Link>
       <button type="button" onClick={signOut}>Sign out</button>
     </nav>
     {error && <p role="alert">{error}</p>}
+    <AdminPageHeader />
     <div className="admin-content">{children}</div>
     <Notification />
   </div>;
 }
 function OrganizationsList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}>
+  return <AdminList searchPlaceholder="Name or abbreviation" sort={{ field: "name", order: "ASC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="name" /><TextField source="abbreviation" />
       <DateField source="created_at" />
       <EditButton />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function OrganizationShow() {
   return <Show><SimpleShowLayout>
@@ -119,13 +159,13 @@ function OrganizationShow() {
   </SimpleShowLayout></Show>;
 }
 function TermsList() {
-  return <List exporter={false} sort={{ field: "starts_on", order: "DESC" }}>
+  return <AdminList searchPlaceholder="Term (e.g. fall-2026)" sort={{ field: "starts_on", order: "DESC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="slug" sortable={false} label="Term" />
       <TextField source="year" /><DateField source="starts_on" /><DateField source="ends_on" />
       <EditButton />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function TermShow() {
   return <Show><SimpleShowLayout>
@@ -134,13 +174,13 @@ function TermShow() {
   </SimpleShowLayout></Show>;
 }
 function CoursesList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}>
+  return <AdminList searchPlaceholder="Course name or number" sort={{ field: "name", order: "ASC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="number" /><TextField source="name" />
       <TextField source="organization.name" label="Organization" sortable={false} />
       <EditButton />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function CourseShow() {
   return <Show><SimpleShowLayout>
@@ -151,7 +191,7 @@ function CourseShow() {
   </SimpleShowLayout></Show>;
 }
 function OfferingsList() {
-  return <List exporter={false} sort={{ field: "created_at", order: "DESC" }}>
+  return <AdminList searchPlaceholder="Offering label" sort={{ field: "created_at", order: "DESC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="label" />
       <TextField source="course.number" label="Course number" sortable={false} />
@@ -160,7 +200,7 @@ function OfferingsList() {
       <TextField source="lms_course_num" label="LMS course number" /><BooleanField source="archived" />
       <EditButton />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function OfferingShow() {
   return <Show><SimpleShowLayout>
@@ -176,14 +216,19 @@ function OfferingShow() {
   </SimpleShowLayout></Show>;
 }
 function BooksList() {
-  return <List exporter={false} sort={{ field: "title", order: "ASC" }}>
-    <Datagrid rowClick="show" bulkActionButtons={false}>
-      <TextField source="id" /><TextField source="title" /><BooleanField source="template" />
-      <TextField source="user.email" label="Owner" sortable={false} />
-      <TextField source="course_offering.label" label="Offering" sortable={false} />
-      <DateField source="last_compiled" showTime emptyText="Not compiled" />
-    </Datagrid>
-  </List>;
+  return( 
+  // The "Admin / Inst Books" header is rendered by AdminPageHeader in the layout.
+  <div className="admin-books-page">
+    <AdminList searchPlaceholder="Book title" sort={{ field: "title", order: "ASC" }}>
+      <Datagrid rowClick="show" bulkActionButtons={false}>
+        <TextField source="id" /><TextField source="title" /><BooleanField source="template" />
+        <TextField source="user.email" label="Owner" sortable={false} />
+        <TextField source="course_offering.label" label="Offering" sortable={false} />
+        <DateField source="last_compiled" showTime emptyText="Not compiled" />
+      </Datagrid>
+    </AdminList>
+  </div>
+  )
 }
 function BookShow() {
   return <Show actions={false}><SimpleShowLayout>
@@ -196,14 +241,14 @@ function BookShow() {
   </SimpleShowLayout></Show>;
 }
 function UsersList() {
-  return <List exporter={false} sort={{ field: "email", order: "ASC" }}>
+  return <AdminList searchPlaceholder="Email or name" sort={{ field: "email", order: "ASC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="email" /><TextField source="first_name" />
       <TextField source="last_name" /><TextField source="global_role.name" label="Role" sortable={false} />
       <DateField source="created_at" showTime /><DateField source="current_sign_in_at" label="Latest sign-in" showTime />
       <NumberField source="sign_in_count" /><EditButton />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function UserShow() {
   return <Show><SimpleShowLayout>
@@ -238,12 +283,12 @@ function UserEdit() {
   </Edit>;
 }
 function RolesList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}>
+  return <AdminList searchPlaceholder="Role name" sort={{ field: "name", order: "ASC" }}>
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="name" /><BooleanField source="builtin" />
       <BooleanField source="can_manage_all_courses" /><BooleanField source="can_edit_system_configuration" />
     </Datagrid>
-  </List>;
+  </AdminList>;
 }
 function RoleShow() {
   return <Show actions={false}><SimpleShowLayout>
@@ -252,11 +297,11 @@ function RoleShow() {
   </SimpleShowLayout></Show>;
 }
 function CourseRolesList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+  return <AdminList searchPlaceholder="Role name" sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
     <TextField source="id" /><TextField source="name" /><BooleanField source="builtin" />
     <BooleanField source="can_manage_course" /><BooleanField source="can_manage_assignments" />
     <BooleanField source="can_grade_submissions" /><BooleanField source="can_view_other_submissions" /><EditButton />
-  </Datagrid></List>;
+  </Datagrid></AdminList>;
 }
 function CourseRoleShow() {
   return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" /><BooleanField source="builtin" />
@@ -265,9 +310,9 @@ function CourseRoleShow() {
   </SimpleShowLayout></Show>;
 }
 function LatePoliciesList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+  return <AdminList searchPlaceholder="Policy name" sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
     <TextField source="id" /><TextField source="name" /><NumberField source="late_days" /><NumberField source="late_percent" /><EditButton />
-  </Datagrid></List>;
+  </Datagrid></AdminList>;
 }
 function LatePolicyShow() {
   return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" />
@@ -275,15 +320,15 @@ function LatePolicyShow() {
   </SimpleShowLayout></Show>;
 }
 function LmsTypesList() {
-  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+  return <AdminList searchPlaceholder="LMS type name" sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
     <TextField source="id" /><TextField source="name" /><EditButton />
-  </Datagrid></List>;
+  </Datagrid></AdminList>;
 }
 function LmsTypeShow() { return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" /></SimpleShowLayout></Show>; }
 function LmsInstancesList() {
-  return <List exporter={false} sort={{ field: "url", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+  return <AdminList searchPlaceholder="Instance URL" sort={{ field: "url", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
     <TextField source="id" /><TextField source="url" /><TextField source="lms_type_id" /><TextField source="organization_id" /><TextField source="client_id" /><EditButton />
-  </Datagrid></List>;
+  </Datagrid></AdminList>;
 }
 function LmsInstanceShow() {
   return <Show><SimpleShowLayout><TextField source="id" /><TextField source="url" />
@@ -307,8 +352,11 @@ export default function AdminDashboard() {
     <Resource name="late-policies" options={{ label: "Late Policies" }} list={LatePoliciesList} show={LatePolicyShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-types" options={{ label: "LMS Types" }} list={LmsTypesList} show={LmsTypeShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-instances" options={{ label: "LMS Instances" }} list={LmsInstancesList} show={LmsInstanceShow} create={AdminCreate} edit={AdminEdit} />
-    <Resource name="books" list={BooksList} show={BookShow} />
+    <Resource name="books" options={{ label: "Book Instances" }} list={BooksList} show={BookShow} />
     <Resource name="users" list={UsersList} show={UserShow} edit={UserEdit} />
     <Resource name="roles" options={{ label: "Global Roles" }} list={RolesList} show={RoleShow} />
+    {adminFeatures.lmsAccesses && <Resource name="lms-accesses" options={{ label: "LMS Accesses" }}
+      list={LmsAccessesList} show={LmsAccessShow} create={LmsAccessCreate} edit={LmsAccessEdit} />}
+    {adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
   </Admin>;
 }

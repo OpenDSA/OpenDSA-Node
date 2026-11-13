@@ -1,6 +1,7 @@
 import { apiFetch } from "../auth/api";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { adminFeatures } from "./adminFeatures";
 
 type Person = { id: number; first_name: string | null; last_name: string | null; email: string };
 type Dashboard = {
@@ -9,7 +10,27 @@ type Dashboard = {
   recentUsers: (Person & { current_sign_in_at: string; current_sign_in_ip: string | null })[];
   offerings: { id: number; label: string; archived: boolean | null;
     course: { id: number; name: string; number: string }; instructor: Person | null }[];
+  // Not returned by the backend yet; the panel shows a notice until it is.
+  recentErrors?: { id: number; class_name: string | null; message: string | null;
+    target_url: string | null; created_at: string | null }[];
 };
+const clip = (value: string | null, length: number) =>
+  !value ? "—" : value.length > length ? `${value.slice(0, length)}…` : value;
+
+function RecentErrors({ errors }: { errors: Dashboard["recentErrors"] }) {
+  if (!Array.isArray(errors)) return <p>Error tracking is not enabled yet.</p>;
+  if (!errors.length) return <p>No errors have been recorded.</p>;
+  const recent = [...errors].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")).slice(0, 6);
+  return <table><thead><tr><th>Class name</th><th>Message</th><th>URL</th><th>Time</th></tr></thead>
+    <tbody>{recent.map(error => <tr key={error.id}>
+      <td>{error.class_name || "—"}</td>
+      <td>{adminFeatures.errors
+        ? <Link to={`/admin/errors/${error.id}/show`}>{clip(error.message, 120)}</Link>
+        : clip(error.message, 120)}</td>
+      <td>{clip(error.target_url, 80)}</td>
+      <td>{error.created_at ? date(error.created_at, true) : "—"}</td>
+    </tr>)}</tbody></table>;
+}
 const name = (person: Person) => [person.first_name, person.last_name].filter(Boolean).join(" ") || person.email;
 const date = (value: string, time = false) => time ? new Date(value).toLocaleString() : value.slice(0, 10);
 
@@ -27,11 +48,12 @@ export default function AdminHome() {
   }, []);
   if (error) return <p role="alert">{error}</p>;
   if (!data) return <p>Loading dashboard…</p>;
+  // The "Administrator Dashboard" title is rendered by AdminPageHeader in the admin layout.
   return <div className="admin-dashboard">
-    <h1>Administrator Dashboard</h1>
     <section className="admin-panel admin-errors" aria-labelledby="recent-errors-heading">
       <h2 id="recent-errors-heading">Recent Errors</h2>
-      <p>Error tracking is not enabled yet.</p>
+      <RecentErrors errors={data.recentErrors} />
+      {adminFeatures.errors && <p className="admin-panel-footer"><Link to="/admin/errors">View all errors</Link></p>}
     </section>
     <div className="admin-home-columns">
     <div className="admin-home-left">
