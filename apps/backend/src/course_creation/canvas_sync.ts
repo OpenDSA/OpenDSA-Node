@@ -22,12 +22,31 @@ export async function ensureCanvasLtiTool(
 ): Promise<void> {
   const toolName = "OpenDSA-Node";
   const existingTools = await client.listExternalTools(params.lmsCourseId);
-  const toolExists =
-    Array.isArray(existingTools) &&
-    existingTools.some((tool) => tool.name === toolName);
+  let existing = Array.isArray(existingTools)
+    ? existingTools.find((tool) =>
+        tool.name === toolName ||
+        // Canvas sometimes names an LTI 1.3 course tool after the developer
+        // key instead of the requested name. Match its launch URL as well.
+        (Boolean(params.clientId) && tool.url === params.launchUrl)
+      )
+    : undefined;
 
-  if (toolExists) {
-    return;
+  // Canvas can only turn an existing course tool into LTI 1.3 at creation
+  // time. Its update endpoint ignores client_id, so a legacy 1.1 tool must be
+  // deleted and recreated when the LMS instance has a developer key.
+  if (existing && params.clientId) {
+    const details = await client.getExternalTool(params.lmsCourseId, existing.id);
+    const isLti13 = details.version === "1.3" ||
+      Boolean(details.developer_key_id) ||
+      Boolean(details.lti_registration_id);
+    if (!isLti13) {
+      await client.deleteExternalTool(params.lmsCourseId, existing.id);
+      existing = undefined;
+    } else {
+      // LTI 1.3 placement/config is owned by the Canvas developer key. Do not
+      // overwrite it through the course-tool API.
+      return;
+    }
   }
 
   const navQuery = new URLSearchParams({
@@ -43,12 +62,16 @@ export async function ensureCanvasLtiTool(
     url: params.launchUrl,
     // client_id is only present for LTI 1.3 supported LMS instances
     ...(params.clientId ? { client_id: params.clientId } : {}),
-    resource_selection: {
-      enabled: true,
-      url: params.resourceSelectionUrl,
-      selection_width: 800,
-      selection_height: 600,
-    },
+    // Deep linking is not implemented yet. Only advertise a resource
+    // selection placement when a selection URL is actually configured.
+    ...(params.resourceSelectionUrl ? {
+      resource_selection: {
+        enabled: true,
+        url: params.resourceSelectionUrl,
+        selection_width: 800,
+        selection_height: 600,
+      },
+    } : {}),
     course_navigation: {
       enabled: true,
       text: "OpenDSA Tools",
@@ -60,6 +83,13 @@ export async function ensureCanvasLtiTool(
       canvas_api_base_url: "$Canvas.api.baseUrl",
     },
   };
+
+  if (existing) {
+    // A tunnel or ingress URL change must update the existing 1.1 course tool;
+    // otherwise Canvas keeps launching the old origin.
+    await client.updateExternalTool(params.lmsCourseId, existing.id, payload);
+    return;
+  }
 
   await client.createExternalTool(params.lmsCourseId, payload);
 }
@@ -253,8 +283,23 @@ export async function syncCanvasModuleItem(
       });
     }
   } 
+  // Update an existing non-gradable module item so origin/tunnel changes are
+  // reflected without recreating the Canvas structure.
+  else if (chapterModule.lms_module_item_id) {
+    await client.updateModuleItem(
+      params.lmsCourseId,
+      params.lmsChapterId,
+      chapterModule.lms_module_item_id,
+      {
+        type: params.canvasContentOnly ? "ExternalUrl" : "ExternalTool",
+        position: params.moduleItemPosition,
+        external_url: itemLaunchUrl,
+        indent: 0,
+      }
+    );
+  }
   // If the module item does not exist, create it
-  else if (!chapterModule.lms_module_item_id) {
+  else {
     const createdModuleItem = await client.createModuleItem(
       params.lmsCourseId,
       params.lmsChapterId,

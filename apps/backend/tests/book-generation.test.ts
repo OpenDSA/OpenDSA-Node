@@ -16,7 +16,8 @@ test("production content generation accepts a user and token, and rejects missin
     prisma.lmsAccesses.findUnique = (async () => ({ access_token: "test-token" })) as any;
     const context = await getGenerationContext(1, 6);
     assert.equal(context.userId, 6);
-    assert.equal(context.canvasContentOnly, true);
+    assert.equal(context.canvasContentOnly, false);
+    assert.equal(context.launchUrl, "https://books.test.invalid/api/lti/launch");
     assert.equal(context.bookPublicBaseUrl, process.env.BOOKS_PUBLIC_URL);
     prisma.lmsAccesses.findUnique = (async () => null) as any;
     await assert.rejects(getGenerationContext(1, 6), /Canvas API token/);

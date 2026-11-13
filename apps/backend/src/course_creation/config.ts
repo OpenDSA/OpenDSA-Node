@@ -13,6 +13,10 @@ export interface CompileConfig {
   simple2fullApiLink: string;
   /** Public base URL where compiled book HTML is served. */
   booksPublicBaseUrl: string;
+  /** Public origin used for LTI launch/keyset URLs. */
+  publicOrigin: string;
+  /** Internal opendsa origin used by the backend to fetch compiled content. */
+  openDsaInternalUrl: string;
   /** Maximum time to wait for a compiler/expander request. */
   timeoutMs: number;
 }
@@ -39,6 +43,15 @@ function deriveSimple2FullLink(configApiLink: string): string {
     : DEFAULT_SIMPLE2FULL_API;
 }
 
+/** Derive the public origin from a configured public URL. */
+function originOf(value: string, fallback: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * Single source of truth for OpenDSA service environment variables.
  * Docker compose and the k8s manifests set these explicitly; the defaults are
@@ -46,6 +59,8 @@ function deriveSimple2FullLink(configApiLink: string): string {
  */
 export function getCompileConfig(): CompileConfig {
   const configApiLink = process.env.CONFIG_API_LINK || DEFAULT_CONFIG_API;
+  const booksPublicBaseUrl =
+    process.env.BOOKS_PUBLIC_URL || "http://localhost:8080/Books";
 
   return {
     openDsaSharedDir:
@@ -53,8 +68,16 @@ export function getCompileConfig(): CompileConfig {
     configApiLink,
     simple2fullApiLink:
       process.env.SIMPLE2FULL_API_LINK || deriveSimple2FullLink(configApiLink),
-    booksPublicBaseUrl:
-      process.env.BOOKS_PUBLIC_URL || "http://localhost:8080/Books",
+    booksPublicBaseUrl,
+    // In production this is the public ingress/tunnel origin. Locally it is
+    // the Vite origin, which proxies /api and the book/static paths.
+    publicOrigin:
+      process.env.PUBLIC_ORIGIN ||
+      originOf(booksPublicBaseUrl, "http://localhost:5173"),
+    // The backend talks to opendsa directly (k8s sidecar or compose service),
+    // never through the public tunnel.
+    openDsaInternalUrl:
+      process.env.OPENDSA_INTERNAL_URL || originOf(configApiLink, "http://opendsa:8080"),
     timeoutMs: positiveInteger(
       process.env.COMPILER_TIMEOUT_MS,
       DEFAULT_TIMEOUT_MS

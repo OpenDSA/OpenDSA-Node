@@ -3,6 +3,7 @@
 
 import { Router } from "express";
 import { handleVerifiedLaunch } from "./handle-verified-launch";
+import { setLaunchFrameHeaders } from "./launch-headers";
 import { validateLtiLaunch } from "./validate-launch";
 
 export const ltiRouter = Router();
@@ -19,6 +20,12 @@ ltiRouter.post("/lti/launch", async (req, res) => {
   const launch = await handleVerifiedLaunch(req, result.context);
   if (launch.type === "error") {
     res.status(launch.status).json({ error: launch.message });
+    return;
+  }
+
+  if (launch.type === "html") {
+    setLaunchFrameHeaders(res, result.context.lmsInstanceUrl);
+    res.type("html").send(launch.html);
     return;
   }
 

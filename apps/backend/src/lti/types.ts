@@ -16,6 +16,22 @@ export interface LtiLaunchContext {
   lmsTypeName: string;
   customInstBookId: number | null;
   customCourseOfferingId: number | null;
+  // Book module launch parameters. Optional so existing callers/tests that
+  // only exercise the course-navigation/tool launch keep working.
+  protocol?: "1.1" | "1.3";
+  customInstChapterModuleId?: number | null;
+  customInstModuleId?: number | null;
+  customInstChapterId?: number | null;
+  customBookPath?: string | null;
+  customModuleFileName?: string | null;
+  customModuleTitle?: string | null;
+  customSectionFileName?: string | null;
+  customInstSectionId?: number | null;
+  customSectionTitle?: string | null;
+  // LTI 1.3 launch session token; used to resume the ltijs LaunchContext for
+  // later exercise/grade requests.
+  ltik?: string | null;
+  rawLaunchParams?: Record<string, string>;
   // canvas sends these on graded launches so we can report a score back later.
   // not doing anything with them yet besides holding onto them - see post-launch.ts
   lisOutcomeServiceUrl: string | null;

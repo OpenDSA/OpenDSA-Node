@@ -56,7 +56,15 @@ test("LTI 1.3 routes default under /api/lti13 and remain overridable", () => {
 test("normalizes ltijs claims into the shared LtiLaunchContext", () => {
   const context = toLaunchContext(
     fakeContext({
-      custom: { custom_course_offering_id: "7" },
+      custom: {
+        custom_course_offering_id: "7",
+        custom_inst_chapter_module_id: "8",
+        custom_inst_module_id: "9",
+        custom_inst_chapter_id: "10",
+        custom_book_path: "org/course/term/label",
+        custom_module_file_name: "Intro",
+        custom_module_title: "01.01 Intro",
+      },
       target:
         "https://tool.example/api/lti13/launches?custom_inst_book_id=42",
     }),
@@ -64,6 +72,7 @@ test("normalizes ltijs claims into the shared LtiLaunchContext", () => {
   );
 
   assert.equal(context.email, "student@example.com");
+  assert.equal(context.protocol, "1.3");
   assert.equal(context.rawUserId, "sub-123");
   assert.equal(context.firstName, "Stu");
   assert.equal(context.lastName, "Dent");
@@ -73,6 +82,13 @@ test("normalizes ltijs claims into the shared LtiLaunchContext", () => {
   // Explicit request/custom params take precedence over target_link_uri.
   assert.equal(context.customInstBookId, 43);
   assert.equal(context.customCourseOfferingId, 7);
+  assert.equal(context.customInstChapterModuleId, 8);
+  assert.equal(context.customInstModuleId, 9);
+  assert.equal(context.customInstChapterId, 10);
+  assert.equal(context.customBookPath, "org/course/term/label");
+  assert.equal(context.customModuleFileName, "Intro");
+  assert.equal(context.customModuleTitle, "01.01 Intro");
+  assert.equal(context.ltik, "test-ltik");
   assert.equal(
     context.lisOutcomeServiceUrl,
     "https://canvas.example/lineitems/9"

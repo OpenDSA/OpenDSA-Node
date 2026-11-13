@@ -120,19 +120,29 @@ export function courseOfferingError(error: unknown): { status: number; error: st
 export async function getGenerationContext(lmsInstanceId: number, userId: number) {
   const user = await prisma.users.findUnique({ where: { id: userId } });
   if (!user) throw new CourseOfferingError(401, "Sign in required.");
+  const lmsInstance = await prisma.lmsInstances.findUnique({ where: { id: lmsInstanceId } });
+  if (!lmsInstance) throw new CourseOfferingError(400, "LMS instance does not exist.");
   const config = getCompileConfig();
-  // Content generation omits LTI registration/launches.
+
+  // LTI 1.3 is selected when the platform has a Canvas developer-key client id
+  // and OAuth endpoints. Otherwise fall back to the existing LTI 1.1 route.
+  const isLti13 = Boolean(lmsInstance.client_id && lmsInstance.oauth2_url);
+  const launchUrl = `${config.publicOrigin}${isLti13 ? "/api/lti13/launches" : "/api/lti/launch"}`;
   const settings = {
-    launchUrl: "", resourceSelectionUrl: "", extrtoolLaunchBaseUrl: "",
-    canvasContentOnly: true,
+    launchUrl,
+    // Deep linking is not implemented yet; leaving this empty keeps Canvas
+    // from exposing a resource-selection placement that returns 501.
+    resourceSelectionUrl: "",
+    extrtoolLaunchBaseUrl: `${config.publicOrigin}/api/lti/launch_extrtool`,
+    canvasContentOnly: false,
     bookPublicBaseUrl: config.booksPublicBaseUrl,
     openDsaSharedDir: config.openDsaSharedDir,
     configApiLink: config.configApiLink,
     timeoutMs: config.timeoutMs,
   };
-  for (const value of [settings.bookPublicBaseUrl, settings.configApiLink]) {
+  for (const value of [settings.bookPublicBaseUrl, settings.launchUrl, settings.configApiLink]) {
     try { const url = new URL(value); if (!["http:", "https:"].includes(url.protocol)) throw Error(); }
-    catch { throw new CourseOfferingError(400, "Invalid compiler or book service URL."); }
+    catch { throw new CourseOfferingError(400, "Invalid compiler, book, or LTI service URL."); }
   }
   const access = await prisma.lmsAccesses.findUnique({ where: {
     lms_instance_id_user_id: { lms_instance_id: lmsInstanceId, user_id: user.id },

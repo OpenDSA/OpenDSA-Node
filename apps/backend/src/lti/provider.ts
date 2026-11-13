@@ -3,6 +3,7 @@ import { Provider, type HttpRequestParameters, type LaunchContext } from "ltijs"
 import type { ExpressRouteRequest } from "./express_http_handler";
 import { RouterHttpHandler } from "./express_http_handler";
 import { handleVerifiedLaunch } from "./handle-verified-launch";
+import { setLaunchFrameHeaders } from "./launch-headers";
 import { PrismaDatabaseManager } from "./prisma_database_manager";
 import type { LtiLaunchContext } from "./types";
 
@@ -95,7 +96,13 @@ export function toLaunchContext(
     (role) => role.includes("#Instructor") || role.includes("#Administrator")
   );
 
+  const optionalString = (name: string) => {
+    const value = param(name);
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+
   return {
+    protocol: "1.3",
     email: idToken.user.email ?? "",
     rawUserId: idToken.user.id ?? null,
     firstName: idToken.user.givenName ?? null,
@@ -110,6 +117,23 @@ export function toLaunchContext(
     customInstBookId: positiveInt(param("custom_inst_book_id")),
     customCourseOfferingId: positiveInt(
       param("custom_course_offering_id")
+    ),
+    customInstChapterModuleId: positiveInt(
+      param("custom_inst_chapter_module_id")
+    ),
+    customInstModuleId: positiveInt(param("custom_inst_module_id")),
+    customInstChapterId: positiveInt(param("custom_inst_chapter_id")),
+    customBookPath: optionalString("custom_book_path"),
+    customModuleFileName: optionalString("custom_module_file_name"),
+    customModuleTitle: optionalString("custom_module_title"),
+    customSectionFileName: optionalString("custom_section_file_name"),
+    customInstSectionId: positiveInt(param("custom_inst_section_id")),
+    customSectionTitle: optionalString("custom_section_title"),
+    ltik: context.ltik ?? null,
+    rawLaunchParams: Object.fromEntries(
+      Object.entries({ ...targetQuery, ...requestQuery, ...custom })
+        .filter(([, value]) => typeof value === "string")
+        .map(([key, value]) => [key, String(value)])
     ),
     // AGS line item + user `sub` are the 1.3 equivalents of the 1.1 outcome
     // pointers; grade passback is implemented later.
@@ -129,6 +153,12 @@ ltiProvider.onResourceLink(async (context, request, response) => {
   const result = await handleVerifiedLaunch(expressRequest, launch);
   if (result.type === "error") {
     response.status(result.status).json({ error: result.message });
+    return;
+  }
+
+  if (result.type === "html") {
+    setLaunchFrameHeaders(expressRequest.res!, launch.lmsInstanceUrl);
+    response.html(result.html);
     return;
   }
 

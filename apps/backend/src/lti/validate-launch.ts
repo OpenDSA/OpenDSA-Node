@@ -101,6 +101,12 @@ export async function validateLtiLaunch(
     const n = Number(v);
     return Number.isSafeInteger(n) && n > 0 ? n : null;
   };
+  const param = (name: string) => str(body[name]);
+  const optionalIntParam = (name: string) => {
+    const value = param(name);
+    return value ? parseIntParam(value) : null;
+  };
+  const optionalStringParam = (name: string) => param(name) || null;
 
   // old code: uri = URI.parse(request.referrer); url = uri.scheme + '://' + uri.host
   let lmsInstanceUrl = "";
@@ -115,6 +121,7 @@ export async function validateLtiLaunch(
   }
 
   const context: LtiLaunchContext = {
+    protocol: "1.1",
     email: str(body["lis_person_contact_email_primary"]) || str(body["custom_contact_email_primary"]),
     rawUserId: str(body["user_id"]) || null,
     firstName: str(body["lis_person_name_given"]) || null,
@@ -122,10 +129,23 @@ export async function validateLtiLaunch(
     isInstructor: provider.instructor,
     lmsInstanceUrl,
     lmsTypeName: str(body["tool_consumer_info_product_family_code"]) || "other",
-    customInstBookId: str(body["custom_inst_book_id"]) ? parseIntParam(str(body["custom_inst_book_id"])) : null,
-    customCourseOfferingId: str(body["custom_course_offering_id"])
-      ? parseIntParam(str(body["custom_course_offering_id"]))
-      : null,
+    customInstBookId: optionalIntParam("custom_inst_book_id"),
+    customCourseOfferingId: optionalIntParam("custom_course_offering_id"),
+    customInstChapterModuleId: optionalIntParam("custom_inst_chapter_module_id"),
+    customInstModuleId: optionalIntParam("custom_inst_module_id"),
+    customInstChapterId: optionalIntParam("custom_inst_chapter_id"),
+    customBookPath: optionalStringParam("custom_book_path"),
+    customModuleFileName: optionalStringParam("custom_module_file_name"),
+    customModuleTitle: optionalStringParam("custom_module_title"),
+    customSectionFileName: optionalStringParam("custom_section_file_name"),
+    customInstSectionId: optionalIntParam("custom_inst_section_id"),
+    customSectionTitle: optionalStringParam("custom_section_title"),
+    rawLaunchParams: Object.fromEntries(
+      Object.entries(body).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? (value[0] ?? "") : (value ?? ""),
+      ])
+    ),
     lisOutcomeServiceUrl: str(body["lis_outcome_service_url"]) || null,
     lisResultSourcedid: str(body["lis_result_sourcedid"]) || null,
   };

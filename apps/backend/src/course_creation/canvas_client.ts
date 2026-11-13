@@ -11,6 +11,12 @@ export interface CanvasCourse {
 export interface CanvasExternalTool {
   id: number;
   name: string;
+  version?: string;
+  client_id?: string;
+  developer_key_id?: number;
+  lti_registration_id?: number;
+  url?: string;
+  [key: string]: unknown;
 }
 
 export interface CanvasEntityWithId {
@@ -72,6 +78,16 @@ export class CanvasClient {
     );
   }
 
+  getExternalTool(
+    lmsCourseId: string,
+    toolId: number
+  ): Promise<CanvasExternalTool> {
+    return this.request<CanvasExternalTool>(
+      "GET",
+      `/courses/${encodeURIComponent(lmsCourseId)}/external_tools/${encodeURIComponent(String(toolId))}`
+    );
+  }
+
   createExternalTool(
     lmsCourseId: string,
     payload: Record<string, unknown>
@@ -80,6 +96,28 @@ export class CanvasClient {
       "POST",
       `/courses/${encodeURIComponent(lmsCourseId)}/external_tools`,
       payload
+    );
+  }
+
+  updateExternalTool(
+    lmsCourseId: string,
+    toolId: number,
+    payload: Record<string, unknown>
+  ): Promise<CanvasEntityWithId> {
+    return this.request<CanvasEntityWithId>(
+      "PUT",
+      `/courses/${encodeURIComponent(lmsCourseId)}/external_tools/${encodeURIComponent(String(toolId))}`,
+      payload
+    );
+  }
+
+  deleteExternalTool(
+    lmsCourseId: string,
+    toolId: number
+  ): Promise<CanvasEntityWithId> {
+    return this.request<CanvasEntityWithId>(
+      "DELETE",
+      `/courses/${encodeURIComponent(lmsCourseId)}/external_tools/${encodeURIComponent(String(toolId))}`
     );
   }
 

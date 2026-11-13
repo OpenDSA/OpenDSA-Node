@@ -3,17 +3,20 @@ import { prisma } from "../db";
 import { sessionLifetimeSeconds } from "../auth/sessions";
 import { buildBookOutputPath } from "../course_creation/utils";
 import { ensureLmsInstance, ensureUser, ltiEnroll } from "./post-launch";
+import { LaunchRenderError, renderModuleLaunch } from "./render-launch";
 import type { LtiLaunchContext } from "./types";
 
 /**
  * Everything both LTI 1.1 and 1.3 do after their protocol-specific signature
  * verification: resolve the book/offering, create or update the LMS user,
- * enroll them, establish the shared iron-session login, and pick a redirect.
+ * enroll them, establish the shared iron-session login, and render the
+ * selected module (or redirect to the instructor dashboard/index).
  *
  * Returns a result instead of writing the response so each protocol can use
  * its own response object.
  */
 export type VerifiedLaunchResult =
+  | { type: "html"; html: string }
   | { type: "redirect"; url: string }
   | { type: "error"; status: number; message: string };
 
@@ -103,8 +106,48 @@ export async function handleVerifiedLaunch(
     courseOfferingLabel: offering.label,
   });
 
-  // Deep links to a specific module are a later step; the index page is the
-  // current 1.1 behavior and matches the compiled html/ output.
+  // Deep link to a specific compiled module. The Canvas module item includes
+  // the chapter-module id; resolve it against this book rather than trusting
+  // the query path/file values.
+  if (context.customInstChapterModuleId) {
+    const chapterModule = await prisma.instChapterModules.findFirst({
+      where: {
+        id: context.customInstChapterModuleId,
+        inst_chapter: { inst_book_id: instBook.id },
+      },
+      include: {
+        inst_module: true,
+        inst_chapter: true,
+      },
+    });
+    if (!chapterModule) {
+      return {
+        type: "error",
+        status: 404,
+        message: "book module not found for this launch",
+      };
+    }
+
+    try {
+      const html = await renderModuleLaunch({
+        context,
+        userEmail: user.email,
+        instBookId: instBook.id,
+        courseOfferingId: instBook.course_offering.id,
+        buildPath,
+        chapterModule,
+      });
+      return { type: "html", html };
+    } catch (error) {
+      if (error instanceof LaunchRenderError) {
+        return { type: "error", status: error.status, message: error.message };
+      }
+      throw error;
+    }
+  }
+
+  // Course-navigation/tool launch without a specific module: keep the
+  // existing book index behavior.
   return {
     type: "redirect",
     url: `/Books/${buildPath}/html/index.html`,
