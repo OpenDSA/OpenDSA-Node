@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { canAccessAdmin, useAuth } from "../auth/Auth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 function Navbar() {
   const { user, logout } = useAuth(); const navigate = useNavigate();
   const canCreate = user && (user.global_role.can_manage_all_courses || ["Administrator", "Instructor", "Researcher"].includes(user.global_role.name));
+  const location = useLocation();
   const [error, setError] = useState("");
   async function signOut() {
     try { await logout(); setError(""); navigate("/login"); }
     catch { setError("Sign out failed. Please retry."); }
   }
+  if (location.pathname === "/admin" || location.pathname.startsWith("/admin/")) return null;
   return (
     <nav className="navbar">
       <div className="navbar-left">

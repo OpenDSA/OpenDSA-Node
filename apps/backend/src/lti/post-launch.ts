@@ -2,6 +2,7 @@
 // whether it was lti 1.1 or 1.3 that did the verifying. ports ensure_lms_instance,
 // ensure_user, and lti_enroll from lti_controller.rb (lines 730, 744, 708)
 
+import { ensureBuiltinCourseRole } from "../services/course-roles";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
@@ -103,19 +104,7 @@ export async function ensureUser(context: LtiLaunchContext, lmsInstance: LmsInst
 }
 
 export async function ltiEnroll(userId: number, courseOfferingId: number, isInstructor: boolean) {
-  const roleName = isInstructor ? "Instructor" : "Student";
-  const isStaffRole = isInstructor;
-  const courseRole = await prisma.courseRoles.findFirst({ where: { name: roleName } })
-    ?? await prisma.courseRoles.create({
-      data: {
-        name: roleName,
-        builtin: true,
-        can_manage_course: isStaffRole,
-        can_manage_assignments: isStaffRole,
-        can_grade_submissions: isStaffRole,
-        can_view_other_submissions: isStaffRole,
-      },
-    });
+  const courseRole = await ensureBuiltinCourseRole(isInstructor);
 
   const existing = await prisma.courseEnrollments.findUnique({
     where: { user_id_course_offering_id: { user_id: userId, course_offering_id: courseOfferingId } },

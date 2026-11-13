@@ -1,20 +1,45 @@
 import { apiFetch } from "../auth/api";
 import {
   Admin, Resource, List, Datagrid, TextField, NumberField, DateField, Show,
-  BooleanField, SimpleShowLayout, Menu, Notification, HttpError,
+  BooleanField, SelectField, SimpleShowLayout, Notification, HttpError,
   Edit, SimpleForm, TextInput, ReferenceInput, SelectInput, Toolbar, SaveButton,
   EditButton, required, email, maxLength, useNotify, useRedirect,
   type DataProvider, type LayoutProps,
 } from "react-admin";
+import { useState, type ReactNode } from "react";
+import { AdminCreate, AdminEdit, seasons } from "./AdminForms";
+import { NavLink, Link, useNavigate } from "react-router-dom";
+import "./admin.css";
 import AdminHome from "./AdminHome";
 import { authFetch, useAuth } from "../auth/Auth";
 
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
-  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles"].includes(resource)) throw new Error("Unknown resource.");
+  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances"].includes(resource)) throw new Error("Unknown resource.");
   const response = await apiFetch(`/api/admin/${resource}${suffix}`);
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Request failed.", response.status, body);
+  return body;
+}
+const editableFields: Record<string, string[]> = {
+  users: ["first_name", "last_name", "email", "global_role_id"],
+  organizations: ["name", "abbreviation"], terms: ["season", "year", "starts_on", "ends_on"],
+  courses: ["name", "number", "organization_id", "user_id"],
+  "course-offerings": ["course_id", "term_id", "label", "lms_instance_id", "lms_course_code", "lms_course_num", "archived"],
+  "course-roles": ["name", "can_manage_course", "can_manage_assignments", "can_grade_submissions", "can_view_other_submissions"],
+  "late-policies": ["name", "late_days", "late_percent"], "lms-types": ["name"],
+  "lms-instances": ["url", "lms_type_id", "organization_id", "consumer_key", "consumer_secret", "client_id",
+    "private_key", "public_key", "keyset_url", "oauth2_url", "platform_oidc_auth_url", "issuer"],
+};
+async function write(resource: string, data: Record<string, unknown>, id?: string | number) {
+  if (!editableFields[resource] || (resource === "users" && id === undefined)) throw new Error("This operation is not supported.");
+  const input = Object.fromEntries(editableFields[resource].filter(key => key in data).map(key =>
+    [key, ["starts_on", "ends_on"].includes(key) && typeof data[key] === "string" ? data[key].slice(0, 10) : data[key]]));
+  const response = await authFetch(`/api/admin/${resource}${id === undefined ? "" : `/${encodeURIComponent(id)}`}`, {
+    method: id === undefined ? "POST" : "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new HttpError(body.error || "Unable to save record.", response.status, body);
   return body;
 }
 const unsupported = async (): Promise<never> => { throw new Error("This operation is not supported."); };
@@ -23,6 +48,7 @@ const dataProvider: DataProvider = {
     const query = new URLSearchParams({
       page: String(params.pagination?.page ?? 1), per_page: String(params.pagination?.perPage ?? 25),
       sort: params.sort?.field ?? "id", order: params.sort?.order ?? "ASC",
+      q: params.filter?.q ?? "",
     });
     return read(resource, `?${query}`);
   },
@@ -31,24 +57,49 @@ const dataProvider: DataProvider = {
     const records = await Promise.all(params.ids.map(id => read(resource, `/${encodeURIComponent(id)}`)));
     return { data: records.map(record => record.data) };
   }, getManyReference: unsupported,
-  create: unsupported,
-  update: async (resource, params) => {
-    if (resource !== "users") return unsupported();
-    const { first_name, last_name, email, global_role_id } = params.data;
-    const response = await authFetch(`/api/admin/users/${encodeURIComponent(params.id)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_name, last_name, email, global_role_id }),
-    });
-    const body = await response.json();
-    if (!response.ok) throw new HttpError(body.error || "User update failed.", response.status, body);
-    return body;
-  }, updateMany: unsupported,
+  create: (resource, params) => write(resource, params.data),
+  update: (resource, params) => write(resource, params.data, params.id),
+  updateMany: unsupported,
   delete: unsupported, deleteMany: unsupported,
 };
+function AdminDropdown({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return <div className="admin-nav-group" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
+    onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}
+    onKeyDown={event => { if (event.key === "Escape") setOpen(false); }}>
+    <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{label} ▾</button>
+    <div hidden={!open} onClick={() => setOpen(false)}>{children}</div>
+  </div>;
+}
 function AdminLayout({ children }: LayoutProps) {
-  return <div style={{ display: "flex", gap: "1rem", minHeight: "60vh" }}>
-    <aside aria-label="Admin resources"><Menu /></aside>
-    <section style={{ flex: 1, minWidth: 0 }}>{children}</section>
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
+  async function signOut() {
+    try { await logout(); navigate("/login"); } catch { setError("Sign out failed. Please retry."); }
+  }
+  return <div className="admin-shell">
+    <nav className="admin-navigation" aria-label="Administration">
+      <Link to="/" className="admin-brand">OpenDSA</Link>
+      <Link to="/" className="admin-back">← Back to OpenDSA</Link>
+      <NavLink to="/admin" end>Dashboard</NavLink>
+      <AdminDropdown label="University-oriented">
+        {[["organizations", "Organizations"], ["terms", "Terms"], ["courses", "Courses"],
+          ["course-offerings", "Course Offerings"], ["course-roles", "Course Roles"],
+          ["roles", "Global Roles"], ["late-policies", "Late Policies"]].map(([path, label]) =>
+          <NavLink key={path} to={`/admin/${path}`}>{label}</NavLink>)}
+      </AdminDropdown>
+      <AdminDropdown label="LMS Config">
+        <NavLink to="/admin/lms-types">LMS Types</NavLink>
+        <NavLink to="/admin/lms-instances">LMS Instances</NavLink>
+      </AdminDropdown>
+      <NavLink to="/admin/books">OpenDSA Books</NavLink>
+      <NavLink to="/admin/users">Users</NavLink>
+      <Link to="/profile" className="admin-user">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email}</Link>
+      <button type="button" onClick={signOut}>Sign out</button>
+    </nav>
+    {error && <p role="alert">{error}</p>}
+    <div className="admin-content">{children}</div>
     <Notification />
   </div>;
 }
@@ -57,11 +108,12 @@ function OrganizationsList() {
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="name" /><TextField source="abbreviation" />
       <DateField source="created_at" />
+      <EditButton />
     </Datagrid>
   </List>;
 }
 function OrganizationShow() {
-  return <Show actions={false}><SimpleShowLayout>
+  return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="name" /><TextField source="abbreviation" />
     <TextField source="slug" /><DateField source="created_at" />
   </SimpleShowLayout></Show>;
@@ -71,12 +123,13 @@ function TermsList() {
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="slug" sortable={false} label="Term" />
       <TextField source="year" /><DateField source="starts_on" /><DateField source="ends_on" />
+      <EditButton />
     </Datagrid>
   </List>;
 }
 function TermShow() {
-  return <Show actions={false}><SimpleShowLayout>
-    <TextField source="id" /><TextField source="slug" label="Term" /><TextField source="season" />
+  return <Show><SimpleShowLayout>
+    <TextField source="id" /><TextField source="slug" label="Term" /><SelectField source="season" choices={seasons} />
     <TextField source="year" /><DateField source="starts_on" /><DateField source="ends_on" />
   </SimpleShowLayout></Show>;
 }
@@ -85,11 +138,12 @@ function CoursesList() {
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="number" /><TextField source="name" />
       <TextField source="organization.name" label="Organization" sortable={false} />
+      <EditButton />
     </Datagrid>
   </List>;
 }
 function CourseShow() {
-  return <Show actions={false}><SimpleShowLayout>
+  return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="number" /><TextField source="name" />
     <TextField source="organization.name" label="Organization" /><TextField source="organization_id" />
     <TextField source="user_id" label="Owner user ID" /><TextField source="slug" />
@@ -104,11 +158,12 @@ function OfferingsList() {
       <TextField source="course.name" label="Course" sortable={false} />
       <TextField source="term.slug" label="Term" sortable={false} />
       <TextField source="lms_course_num" label="LMS course number" /><BooleanField source="archived" />
+      <EditButton />
     </Datagrid>
   </List>;
 }
 function OfferingShow() {
-  return <Show actions={false}><SimpleShowLayout>
+  return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="label" />
     <TextField source="course.name" label="Course" /><TextField source="course_id" />
     <TextField source="term.slug" label="Term" /><TextField source="term_id" />
@@ -196,14 +251,62 @@ function RoleShow() {
     <BooleanField source="can_manage_all_courses" /><BooleanField source="can_edit_system_configuration" />
   </SimpleShowLayout></Show>;
 }
+function CourseRolesList() {
+  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+    <TextField source="id" /><TextField source="name" /><BooleanField source="builtin" />
+    <BooleanField source="can_manage_course" /><BooleanField source="can_manage_assignments" />
+    <BooleanField source="can_grade_submissions" /><BooleanField source="can_view_other_submissions" /><EditButton />
+  </Datagrid></List>;
+}
+function CourseRoleShow() {
+  return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" /><BooleanField source="builtin" />
+    <BooleanField source="can_manage_course" /><BooleanField source="can_manage_assignments" />
+    <BooleanField source="can_grade_submissions" /><BooleanField source="can_view_other_submissions" />
+  </SimpleShowLayout></Show>;
+}
+function LatePoliciesList() {
+  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+    <TextField source="id" /><TextField source="name" /><NumberField source="late_days" /><NumberField source="late_percent" /><EditButton />
+  </Datagrid></List>;
+}
+function LatePolicyShow() {
+  return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" />
+    <NumberField source="late_days" /><NumberField source="late_percent" />
+  </SimpleShowLayout></Show>;
+}
+function LmsTypesList() {
+  return <List exporter={false} sort={{ field: "name", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+    <TextField source="id" /><TextField source="name" /><EditButton />
+  </Datagrid></List>;
+}
+function LmsTypeShow() { return <Show><SimpleShowLayout><TextField source="id" /><TextField source="name" /></SimpleShowLayout></Show>; }
+function LmsInstancesList() {
+  return <List exporter={false} sort={{ field: "url", order: "ASC" }}><Datagrid rowClick="show" bulkActionButtons={false}>
+    <TextField source="id" /><TextField source="url" /><TextField source="lms_type_id" /><TextField source="organization_id" /><TextField source="client_id" /><EditButton />
+  </Datagrid></List>;
+}
+function LmsInstanceShow() {
+  return <Show><SimpleShowLayout><TextField source="id" /><TextField source="url" />
+    <TextField source="lms_type_id" /><TextField source="organization_id" />
+    <TextField source="consumer_key" /><TextField source="client_id" /><TextField source="issuer" />
+    <TextField source="keyset_url" /><TextField source="oauth2_url" /><TextField source="platform_oidc_auth_url" />
+    <TextField source="public_key" /><DateField source="created_at" /><DateField source="updated_at" />
+  </SimpleShowLayout></Show>;
+}
 export default function AdminDashboard() {
   // The surrounding RequireAuth and every /api/admin endpoint enforce administrator access.
   return <Admin basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={AdminHome}
-    disableTelemetry title="OpenDSA Administration">
-    <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} />
-    <Resource name="terms" list={TermsList} show={TermShow} />
-    <Resource name="courses" list={CoursesList} show={CourseShow} />
-    <Resource name="course-offerings" options={{ label: "Course Offerings" }} list={OfferingsList} show={OfferingShow} />
+    disableTelemetry theme={{ palette: { mode: "light", primary: { main: "#175c91" },
+      background: { default: "#f4f6f8", paper: "#ffffff" }, text: { primary: "#202b36", secondary: "#4b5968" } },
+      typography: { fontFamily: "Arial, Helvetica, sans-serif" } }} darkTheme={null} title="OpenDSA Administration">
+    <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="terms" list={TermsList} show={TermShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="courses" list={CoursesList} show={CourseShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="course-offerings" options={{ label: "Course Offerings" }} list={OfferingsList} show={OfferingShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="course-roles" options={{ label: "Course Roles" }} list={CourseRolesList} show={CourseRoleShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="late-policies" options={{ label: "Late Policies" }} list={LatePoliciesList} show={LatePolicyShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="lms-types" options={{ label: "LMS Types" }} list={LmsTypesList} show={LmsTypeShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="lms-instances" options={{ label: "LMS Instances" }} list={LmsInstancesList} show={LmsInstanceShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="books" list={BooksList} show={BookShow} />
     <Resource name="users" list={UsersList} show={UserShow} edit={UserEdit} />
     <Resource name="roles" options={{ label: "Global Roles" }} list={RolesList} show={RoleShow} />

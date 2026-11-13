@@ -29,13 +29,22 @@ export default function AdminHome() {
   if (!data) return <p>Loading dashboard…</p>;
   return <div className="admin-dashboard">
     <h1>Administrator Dashboard</h1>
-    <section>
+    <section className="admin-panel admin-errors" aria-labelledby="recent-errors-heading">
+      <h2 id="recent-errors-heading">Recent Errors</h2>
+      <p>Error tracking is not enabled yet.</p>
+    </section>
+    <div className="admin-home-columns">
+    <div className="admin-home-left">
+    <section className="admin-panel">
       <h2>Current Term</h2>
       {!data.term ? <p>No terms have been created.</p> : <>
         {!data.termIsCurrent && <p>No term is currently active; showing the earliest configured term.</p>}
         <table><thead><tr><th>Term</th><th>Starts on</th><th>Ends on</th></tr></thead>
           <tbody><tr><td><Link to={`/admin/terms/${data.term.id}/show`}>{data.term.slug}</Link></td>
             <td>{date(data.term.starts_on)}</td><td>{date(data.term.ends_on)}</td></tr></tbody></table>
+      </>}
+    </section>
+    <section className="admin-panel">
         <h2>Course Offerings</h2>
         {!data.offerings.length ? <p>No offerings for this term.</p> :
           <table><thead><tr><th>Course</th><th>Offering</th><th>Instructor</th><th>Archived</th></tr></thead>
@@ -45,9 +54,9 @@ export default function AdminHome() {
               <td>{offering.instructor ? <Link to={`/admin/users/${offering.instructor.id}/show`}>{name(offering.instructor)}</Link> : "—"}</td>
               <td>{offering.archived ? "Yes" : "No"}</td>
             </tr>)}</tbody></table>}
-      </>}
     </section>
-    <section><h2>Recent Users</h2>
+    </div>
+    <section className="admin-panel"><h2>Recent Users</h2>
       {!data.recentUsers.length ? <p>No sign-ins have been recorded.</p> :
         <table><thead><tr><th>Name</th><th>Email</th><th>Latest sign-in</th><th>IP</th></tr></thead>
           <tbody>{data.recentUsers.map(user => <tr key={user.id}>
@@ -55,5 +64,6 @@ export default function AdminHome() {
             <td>{date(user.current_sign_in_at, true)}</td><td>{user.current_sign_in_ip || "—"}</td>
           </tr>)}</tbody></table>}
     </section>
+    </div>
   </div>;
 }

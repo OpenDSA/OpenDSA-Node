@@ -1,3 +1,4 @@
+import { ensureBuiltinCourseRole } from "../src/services/course-roles";
 import assert from "node:assert/strict";
 import { hashPassword } from "../src/auth/passwords";
 import { PrismaClient } from "@prisma/client";
@@ -19,16 +20,8 @@ export async function seedAcademic(prisma: PrismaClient) {
       } }));
   }
   const [adminRole, instructorRole, researcherRole, regularRole] = roles;
-  const courseRoles = [];
-  for (const name of ["Instructor", "Student"]) {
-    const staff = name === "Instructor";
-    courseRoles.push(await prisma.courseRoles.findFirst({ where: { name }, orderBy: { id: "asc" } }) ??
-      await prisma.courseRoles.create({ data: {
-        name, builtin: true, can_manage_course: staff, can_manage_assignments: staff,
-        can_grade_submissions: staff, can_view_other_submissions: staff,
-      } }));
-  }
-  const [staffRole, studentRole] = courseRoles;
+  const staffRole = await ensureBuiltinCourseRole(true, prisma);
+  const studentRole = await ensureBuiltinCourseRole(false, prisma);
   const zone = await prisma.timeZones.findFirst({ where: { name: "America/New_York" }, orderBy: { id: "asc" } }) ??
     await prisma.timeZones.create({ data: {
       name: "America/New_York", zone: "UTC -05:00", display_as: "UTC -05:00(New York)",

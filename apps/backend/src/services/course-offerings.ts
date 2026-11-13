@@ -2,6 +2,7 @@ import { generateCourse } from "../course_creation/generate_course";
 import { getCompileConfig } from "../course_creation/config";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
+import { ensureBuiltinCourseRole } from "./course-roles";
 import { cloneBook } from "./clone-book";
 
 export class CourseOfferingError extends Error {
@@ -97,8 +98,7 @@ export async function createCourseOffering(input: CreateCourseOfferingInput, own
     const instBookId = input.book_instance_id === undefined ? undefined :
       await cloneBook(tx, input.book_instance_id, offering.id, ownerId!);
     if (ownerId) {
-      const role = await tx.courseRoles.findFirst({ where: { name: "Instructor" } });
-      if (!role) throw new CourseOfferingError(400, "Instructor role is missing; run the seed.");
+      const role = await ensureBuiltinCourseRole(true, tx);
       await tx.courseEnrollments.create({ data: {
         user_id: ownerId, course_offering_id: offering.id, course_role_id: role.id,
       } });
