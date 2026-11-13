@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch, onSessionExpired, logoutSucceeded } from "./api";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -12,24 +13,45 @@ const AuthContext = createContext<{ user: User | null; loading: boolean;
 
 // Fetch a fresh CSRF token from the session, including after login rotation.
 export async function authFetch(url: string, options: RequestInit = {}) {
-  const tokenResponse = await fetch("/api/auth/csrf");
+  const tokenResponse = await apiFetch("/api/auth/csrf");
   if (!tokenResponse.ok) throw new Error("Authentication is unavailable.");
   const { csrfToken } = await tokenResponse.json();
   const headers = new Headers(options.headers); headers.set("X-CSRF-Token", csrfToken);
-  return fetch(url, { ...options, headers });
+  return apiFetch(url, { ...options, headers });
 }
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  async function refresh() {
-    try { const response = await fetch("/api/auth/me"); setUser(response.ok ? (await response.json()).user : null); }
-    finally { setLoading(false); }
-  }
-  useEffect(() => { refresh().catch(() => setUser(null)); }, []);
+  const revision = useRef(0);
+  const clearUser = useCallback(() => { revision.current++; setUser(null); }, []);
+  const refresh = useCallback(async () => {
+    const request = ++revision.current;
+    try {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!response.ok) {
+        if (response.status === 401 && request === revision.current) clearUser();
+        return;
+      }
+      const body = await response.json();
+      if (request === revision.current) setUser(body.user);
+    } finally { setLoading(false); }
+  }, [clearUser]);
+  useEffect(() => {
+    const unsubscribe = onSessionExpired(clearUser);
+    const recheck = () => { if (document.visibilityState === "visible") refresh().catch(() => {}); };
+    refresh().catch(() => {});
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      unsubscribe(); revision.current++;
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+  }, [refresh, clearUser]);
   async function logout() {
     const response = await authFetch("/api/auth/logout", { method: "POST" });
-    if (!response.ok) throw new Error("Sign out failed. Please retry.");
-    setUser(null);
+    if (!logoutSucceeded(response)) throw new Error("Sign out failed. Please retry.");
+    clearUser();
   }
   return <AuthContext.Provider value={{ user, loading, refresh, logout }}>{children}</AuthContext.Provider>;
 }

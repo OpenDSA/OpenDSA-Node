@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useLocation } from "react-router-dom";
@@ -29,7 +30,7 @@ export default function Profile() {
     const controller = new AbortController();
     setLoading(true); setError("");
     async function load(path: string) {
-      const response = await fetch(path, { signal: controller.signal });
+      const response = await apiFetch(path, { signal: controller.signal });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Unable to load your profile.");
       return body;

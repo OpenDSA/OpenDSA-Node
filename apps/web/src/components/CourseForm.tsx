@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 import { authFetch } from "../auth/Auth";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -10,7 +11,7 @@ interface LmsInstance { id: number; url: string; organization_id: number | null 
 const seasons: Record<number, string> = { 100: "Spring", 200: "Summer I", 300: "Summer II", 400: "Fall", 500: "Winter" };
 
 async function loadOptions<T>(path: string, signal: AbortSignal): Promise<T[]> {
-    const response = await fetch(`/api/${path}`, { signal });
+    const response = await apiFetch(`/api/${path}`, { signal });
     if (!response.ok) throw new Error("Unable to load form options. Please reload.");
     const body = await response.json();
     return body.data;

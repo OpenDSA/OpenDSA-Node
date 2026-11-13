@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 import {
   Admin, Resource, List, Datagrid, TextField, NumberField, DateField, Show,
   BooleanField, SimpleShowLayout, Menu, Notification, HttpError,
@@ -11,7 +12,7 @@ import { authFetch, useAuth } from "../auth/Auth";
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
   if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles"].includes(resource)) throw new Error("Unknown resource.");
-  const response = await fetch(`/api/admin/${resource}${suffix}`);
+  const response = await apiFetch(`/api/admin/${resource}${suffix}`);
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Request failed.", response.status, body);
   return body;

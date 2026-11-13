@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 /*
  * AI Assistance Disclosure:
  * I used AI (ChatGPT) to help develop the CreateTextbook component.
@@ -35,7 +36,7 @@ function CreateTextbook() {
   useEffect(() => {
     const controller = new AbortController();
     async function load(path: string) {
-      const response = await fetch(`/api/${path}`, { signal: controller.signal });
+      const response = await apiFetch(`/api/${path}`, { signal: controller.signal });
       if (!response.ok) throw new Error("Unable to load form options. Please reload.");
       return (await response.json()).data;
     }

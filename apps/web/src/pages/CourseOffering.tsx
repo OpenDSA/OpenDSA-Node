@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 import { authFetch } from "../auth/Auth";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -19,7 +20,7 @@ export default function CourseOffering() {
   const inFlight = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/course-offerings/${id}`, { signal: controller.signal })
+    apiFetch(`/api/course-offerings/${id}`, { signal: controller.signal })
       .then(async response => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error);

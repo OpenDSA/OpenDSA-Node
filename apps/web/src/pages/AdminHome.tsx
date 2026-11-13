@@ -1,3 +1,4 @@
+import { apiFetch } from "../auth/api";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -17,7 +18,7 @@ export default function AdminHome() {
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/admin/dashboard", { signal: controller.signal }).then(async response => {
+    apiFetch("/api/admin/dashboard", { signal: controller.signal }).then(async response => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Unable to load dashboard.");
       setData(body);
