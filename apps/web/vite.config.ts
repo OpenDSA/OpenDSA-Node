@@ -23,8 +23,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: [".ngrok-free.dev", ".trycloudflare.com"],
     proxy: {
       '/api': backendTarget,
+      '/OpenDSA': {
+        target: opendsaTarget,
+        rewrite: (path) => path.replace(/^\/OpenDSA(?=\/|$)/, '') || '/',
+      },
       ...Object.fromEntries(opendsaRoutes.map((route) => [route, opendsaTarget])),
     },
   },

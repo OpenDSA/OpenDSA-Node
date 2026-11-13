@@ -30,7 +30,7 @@ services:
       # ingress: it proxies /api to the backend and the book/static paths
       # to opendsa. Use :5173 as the public origin for local LTI URLs and
       # generated book links.
-      - BOOKS_PUBLIC_URL=http://localhost:5173/Books
+      - BOOKS_PUBLIC_URL=https://toolbar-dealers-disposition-excuse.trycloudflare.com/Books
     depends_on:
       mysql:
         condition: service_healthy
