@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opendsa-legacy-prefix-ingress
+  namespace: 91762f26-opendsanode
+  annotations:
+    # matches 60-ingress.yaml's existing public access policy, but with a different path prefix.
+    nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: 91762f26-opendsanode.discovery.cs.vt.edu
+      http:
+        paths:
+        # strips /OpenDSA(and /OpenDSA/ with anything after it). and fowards
+        # the rest straight o opendsa - e.g /OpenDSA/Books/123 becomes 
+        # /Books/123, /OpenDSA/ becomes /, etc. This is a legacy path prefix
+        - path: /OpenDSA(/|$)(.*)
+          pathType: ImplementationSpecific
+          backend:
+            service:
+              name: opendsa
+              port:
+                number: 8080
