@@ -11,7 +11,7 @@ import { AdminCreate, AdminEdit, seasons } from "./AdminForms";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./admin.css";
 import AdminHome from "./AdminHome";
-import { authFetch, useAuth } from "../auth/Auth";
+import { authFetch, canAccessAdmin, useAuth } from "../auth/Auth";
 import { AdminList, AdminPageHeader } from "./AdminListTools";
 import { adminFeatures } from "./adminFeatures";
 import { LmsAccessesList, LmsAccessShow, LmsAccessEdit, LmsAccessCreate } from "./AdminLmsAccesses";
@@ -30,8 +30,9 @@ function withoutSecrets<T>(resource: string, body: T): T {
 }
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
-  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "errors"].includes(resource)) throw new Error("Unknown resource.");
-  const response = await apiFetch(`/api/admin/${resource}${suffix}`);
+  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "lms-access-instances", "errors"].includes(resource)) throw new Error("Unknown resource.");
+  const path = resource === "lms-access-instances" ? "lms-accesses/options/lms-instances" : resource;
+  const response = await apiFetch(`/api/admin/${path}${suffix}`);
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Request failed.", response.status, body);
   return withoutSecrets(resource, body);
@@ -117,23 +118,23 @@ function AdminLayout({ children }: LayoutProps) {
     <nav className="admin-navigation" aria-label="Administration">
       <Link to="/" className="admin-brand">OpenDSA</Link>
       <Link to="/" className="admin-back">← Back to OpenDSA</Link>
-      <NavLink to="/admin" end>Dashboard</NavLink>
-      <AdminDropdown label="University-oriented">
+      {canAccessAdmin(user) && <NavLink to="/admin" end>Dashboard</NavLink>}
+      {canAccessAdmin(user) && <AdminDropdown label="University-oriented">
         {[["organizations", "Organizations"], ["terms", "Terms"], ["courses", "Courses"],
           ["course-offerings", "Course Offerings"], ["course-roles", "Course Roles"],
           ["roles", "Global Roles"], ["late-policies", "Late Policies"]].map(([path, label]) =>
           <NavLink key={path} to={`/admin/${path}`}>{label}</NavLink>)}
-      </AdminDropdown>
+      </AdminDropdown>}
       <AdminDropdown label="LMS Config">
-        <NavLink to="/admin/lms-types">LMS Types</NavLink>
-        <NavLink to="/admin/lms-instances">LMS Instances</NavLink>
+        {canAccessAdmin(user) && <><NavLink to="/admin/lms-types">LMS Types</NavLink>
+        <NavLink to="/admin/lms-instances">LMS Instances</NavLink></>}
         {adminFeatures.lmsAccesses && <NavLink to="/admin/lms-accesses">LMS Accesses</NavLink>}
       </AdminDropdown>
-      <AdminDropdown label="OpenDSA Books">
+      {canAccessAdmin(user) && <><AdminDropdown label="OpenDSA Books">
         <NavLink to="/admin/books">Book Instances</NavLink>
       </AdminDropdown>
       <NavLink to="/admin/users">Users</NavLink>
-      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}
+      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}</>}
       <Link to="/profile" className="admin-user">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email}</Link>
       <button type="button" onClick={signOut}>Sign out</button>
     </nav>
@@ -339,11 +340,14 @@ function LmsInstanceShow() {
   </SimpleShowLayout></Show>;
 }
 export default function AdminDashboard() {
-  // The surrounding RequireAuth and every /api/admin endpoint enforce administrator access.
-  return <Admin basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={AdminHome}
+  const { user } = useAuth();
+  const administrator = canAccessAdmin(user);
+  // Credential owners have a narrow route; other resources remain administrator-only.
+  return <Admin key={`${user?.id}:${administrator}`} basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={administrator ? AdminHome : undefined}
     disableTelemetry theme={{ palette: { mode: "light", primary: { main: "#175c91" },
       background: { default: "#f4f6f8", paper: "#ffffff" }, text: { primary: "#202b36", secondary: "#4b5968" } },
       typography: { fontFamily: "Arial, Helvetica, sans-serif" } }} darkTheme={null} title="OpenDSA Administration">
+    {administrator && <>
     <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="terms" list={TermsList} show={TermShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="courses" list={CoursesList} show={CourseShow} create={AdminCreate} edit={AdminEdit} />
@@ -355,8 +359,9 @@ export default function AdminDashboard() {
     <Resource name="books" options={{ label: "Book Instances" }} list={BooksList} show={BookShow} />
     <Resource name="users" list={UsersList} show={UserShow} edit={UserEdit} />
     <Resource name="roles" options={{ label: "Global Roles" }} list={RolesList} show={RoleShow} />
+    </>}
     {adminFeatures.lmsAccesses && <Resource name="lms-accesses" options={{ label: "LMS Accesses" }}
       list={LmsAccessesList} show={LmsAccessShow} create={LmsAccessCreate} edit={LmsAccessEdit} />}
-    {adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
+    {administrator && adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
   </Admin>;
 }

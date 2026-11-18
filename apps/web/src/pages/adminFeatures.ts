@@ -1,4 +1,4 @@
-// Admin screens whose backend endpoints are not implemented yet.
+// Feature switches; LMS Accesses is wired, Errors remains deferred.
 // While a flag is off, its screens are neither routed nor linked, so nothing
 // looks operational without a real API behind it. The comment on each flag
 // names the endpoints it needs.
@@ -11,9 +11,9 @@ const enabled = (name: string, fallback: boolean) => {
 
 export const adminFeatures: Readonly<{ lmsAccesses: boolean; lmsAccessDelete: boolean; errors: boolean }> = {
   // GET/POST /api/admin/lms-accesses, GET/PATCH /api/admin/lms-accesses/:id
-  lmsAccesses: enabled("LMS_ACCESSES", false),
+  lmsAccesses: enabled("LMS_ACCESSES", true),
   // DELETE /api/admin/lms-accesses/:id
-  lmsAccessDelete: enabled("LMS_ACCESS_DELETE", false),
+  lmsAccessDelete: enabled("LMS_ACCESS_DELETE", true),
   // GET /api/admin/errors, GET /api/admin/errors/:id
   errors: enabled("ERRORS", false),
 };

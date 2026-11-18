@@ -169,7 +169,7 @@ Sign up at `/signup`; successful signup opens `/profile` to edit first name, las
 
 The administrator dashboard at `/admin` uses React-admin to browse Organizations,
 Terms, Courses, Course Offerings, Books, Users, and Global Roles from the database, with sorting, pagination, and record details. These
-screens and their `/api/admin` endpoints require administrator access. Administrators
+screens and their `/api/admin` endpoints require administrator access, except LMS Accesses as described below. Administrators
 can create/edit Organizations, Terms, Courses, Course Offerings, Course Roles,
 Late Policies, LMS Types, and LMS Instances, and edit users’ names, email, and assigned global
 role. Offering creation enrolls the creator as instructor; offering edits clear
@@ -190,3 +190,5 @@ On the first login both timestamps match. The admin Users screen displays these
 metrics; failed logins and session restoration do not update them. New signup
 and LTI accounts receive creation/update timestamps; missing historical dates
 are not backfilled.
+
+LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Tokens and consumer secrets are write-only (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.

@@ -1,5 +1,6 @@
+import { adminFeatures } from "../pages/adminFeatures";
 import { useState } from "react";
-import { canAccessAdmin, useAuth } from "../auth/Auth";
+import { canAccessAdmin, canManageLmsAccess, useAuth } from "../auth/Auth";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
 function Navbar() {
@@ -63,6 +64,7 @@ function Navbar() {
         </div>
 
         <div className="navbar-right">
+          {adminFeatures.lmsAccesses && canManageLmsAccess(user) && !canAccessAdmin(user) && <Link to="/admin/lms-accesses">LMS Accesses</Link>}
           {canAccessAdmin(user) && (
             <Link 
               to="/admin" 

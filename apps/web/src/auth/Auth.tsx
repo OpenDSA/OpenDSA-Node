@@ -8,6 +8,9 @@ export interface User { id: number; email: string; first_name: string | null; la
 export function canAccessAdmin(user: User | null) {
   return !!user && (user.global_role.name === "Administrator" || user.global_role.can_edit_system_configuration);
 }
+export function canManageLmsAccess(user: User | null) {
+  return !!user && (canAccessAdmin(user) || ["Instructor", "Researcher"].includes(user.global_role.name));
+}
 const AuthContext = createContext<{ user: User | null; loading: boolean;
   refresh: () => Promise<void>; logout: () => Promise<void> } | null>(null);
 
@@ -56,10 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={{ user, loading, refresh, logout }}>{children}</AuthContext.Provider>;
 }
 export function useAuth() { const auth = useContext(AuthContext); if (!auth) throw new Error("AuthProvider is missing"); return auth; }
-export function RequireAuth({ children, instructor = false, administrator = false }: { children: ReactNode; instructor?: boolean; administrator?: boolean }) {
+export function RequireAuth({ children, instructor = false, administrator = false, lmsAccess = false }: { children: ReactNode; instructor?: boolean; administrator?: boolean; lmsAccess?: boolean }) {
   const { user, loading } = useAuth(); const location = useLocation();
   if (loading) return <p>Loading…</p>;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (lmsAccess && !canManageLmsAccess(user)) return <p role="alert">Instructor access required.</p>;
   if (administrator && !canAccessAdmin(user)) return <p role="alert">Administrator access required.</p>;
   if (instructor && !user.global_role.can_manage_all_courses && !["Administrator", "Instructor", "Researcher"].includes(user.global_role.name)) {
     return <p role="alert">Instructor access required.</p>;
