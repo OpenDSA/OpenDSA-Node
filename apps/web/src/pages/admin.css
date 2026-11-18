@@ -138,3 +138,12 @@ main:has(.admin-shell) {
   .admin-page-header { padding: 10px 14px; }
   .admin-page-header h1 { font-size: 24px; }
 }
+
+/* Keep full LMS credentials on one line; scroll the list and filters together. */
+.admin-content:has(.admin-lms-accesses) { overflow-x: auto; }
+.admin-shell .admin-lms-accesses { width: max-content; min-width: 100%; gap: 24px; align-items: flex-start; }
+.admin-shell .admin-lms-accesses .RaList-main { flex: 1 0 auto; }
+.admin-shell .admin-lms-accesses .RaList-content { overflow: visible; }
+.admin-shell .admin-lms-accesses th,
+.admin-shell .admin-lms-accesses td { white-space: nowrap; }
+.admin-shell .admin-lms-accesses .admin-filters { flex: 0 0 260px; }
