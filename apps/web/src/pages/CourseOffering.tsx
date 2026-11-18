@@ -19,6 +19,7 @@ export default function CourseOffering() {
   const [bookUrl, setBookUrl] = useState("");
   const inFlight = useRef(false);
   useEffect(() => {
+    setOffering(null); setBookUrl(""); setError("");
     const controller = new AbortController();
     apiFetch(`/api/course-offerings/${id}`, { signal: controller.signal })
       .then(async response => {
@@ -30,13 +31,17 @@ export default function CourseOffering() {
   }, [id]);
 
   async function generate() {
-    if (inFlight.current || !window.confirm("Generate this book's modules and assignments in the Canvas course shown?")) return;
+    if (inFlight.current || !offering || offering.inst_books.length !== 1) return;
+    if (!offering.standalone && !window.confirm("Generate this book's modules and assignments in the Canvas course shown?")) return;
     inFlight.current = true; setGenerating(true); setError(""); setBookUrl("");
     try {
-      const response = await authFetch(`/api/course-offerings/${id}/generate`, { method: "POST" });
+      const endpoint = offering.standalone
+        ? `/api/inst_books/${offering.inst_books[0].id}/compile`
+        : `/api/course-offerings/${id}/generate`;
+      const response = await authFetch(endpoint, { method: "POST" });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
-      setBookUrl(body.data.book_url);
+      if (!response.ok) throw new Error(body.error || (offering.standalone ? "Compilation failed. Your saved textbook is retained; you can retry." : "Generation failed."));
+      setBookUrl(offering.standalone ? body.data.bookUrl : body.data.book_url);
     } catch (error) { setError(error instanceof Error ? error.message : "Generation failed."); }
     finally { inFlight.current = false; setGenerating(false); }
   }
@@ -49,11 +54,11 @@ export default function CourseOffering() {
       <p>Term: {offering.term.slug}</p>
       {!offering.standalone && <p>Canvas course: {offering.lms_instance.url}/courses/{offering.lms_course_num}</p>}
       {offering.inst_books.map(book => <p key={book.id}>Book: {book.title}</p>)}
-      {!offering.standalone && <button type="button" disabled={generating || offering.inst_books.length !== 1} onClick={generate}>
-        Generate Canvas Course
-      </button>}
-      {generating && <p role="status">Generating…</p>}
-      {bookUrl && <p role="status">Generation succeeded. <a href={bookUrl}>Open compiled book</a></p>}
+      <button type="button" disabled={generating || offering.inst_books.length !== 1} onClick={generate}>
+        {offering.standalone ? "Compile Textbook" : "Generate Canvas Course"}
+      </button>
+      {generating && <p role="status">{offering.standalone ? "Compiling textbook…" : "Generating…"}</p>}
+      {bookUrl && <p role="status">{offering.standalone ? "Compilation succeeded." : "Generation succeeded."} <a href={bookUrl}>Open compiled book</a></p>}
     </> : !error && <p>Loading…</p>}
   </div>;
 }
