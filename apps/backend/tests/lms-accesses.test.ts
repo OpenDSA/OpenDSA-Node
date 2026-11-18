@@ -5,7 +5,7 @@ import { app } from "../src/app";
 import { prisma } from "../src/db";
 import { signInForTest } from "./auth-client";
 
-test("LMS accesses enforce ownership, protect credentials, validate CRUD and preserve progress", async () => {
+test("LMS accesses enforce ownership, return credentials only to authorized users, validate CRUD and preserve progress", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>(resolve => server.once("listening", resolve));
   const address = server.address(); assert(address && typeof address !== "string");
@@ -45,10 +45,10 @@ test("LMS accesses enforce ownership, protect credentials, validate CRUD and pre
       const record = created.body.data, path = `/${record.id}`;
       assert.equal(record.user_id, owner.id);
       for (const result of [created, await request(path), await request(`?lms_instance_id=${lms.id}`)]) {
-        assert.ok(!JSON.stringify(result.body).includes(token));
-        assert.ok(!JSON.stringify(result.body).includes(secret));
+        assert.ok(JSON.stringify(result.body).includes(token));
+        assert.ok(JSON.stringify(result.body).includes(secret));
       }
-      assert.equal(record.access_token_hint, "5678");
+      assert.equal(record.access_token, token);
       assert.equal((await request("", "POST", { lms_instance_id: lms.id })).status, 409);
       assert.equal((await request(path, "PATCH", { user_id: administrator.id })).status, 403);
       assert.equal((await request("", "POST", { lms_instance_id: lms.id, user_id: administrator.id })).status, 403);

@@ -9,22 +9,9 @@ import { Link } from "react-router-dom";
 import { AdminList } from "./AdminListTools";
 import { adminFeatures } from "./adminFeatures";
 
-// Expected record shape: the API never returns
-// plaintext access tokens or consumer secrets, only a short hint and a presence flag;
-// the data provider also strips `access_token`/`consumer_secret` if a response contains them.
 type Person = { id: number; first_name: string | null; last_name: string | null; email: string };
 const personName = (user: Person) => [user.first_name, user.last_name].filter(Boolean).join(" ");
 const personLabel = (user: Person) => personName(user) ? `${personName(user)} - ${user.email}` : user.email;
-
-// Shows at most the last four characters a hint contains, so an over-long hint is never shown in full.
-function MaskedCredential({ hint, present }: { hint: string; present: string; label?: string }) {
-  const record = useRecordContext();
-  if (!record) return null;
-  if (!(hint in record) && !(present in record)) return <span className="admin-muted">Not available</span>;
-  const tail = typeof record[hint] === "string" ? record[hint].replace(/[^A-Za-z0-9_-]/g, "").slice(-4) : "";
-  if (!tail && record[present] !== true) return <span className="admin-muted">Not set</span>;
-  return <span className="admin-masked" aria-label={tail ? `Hidden; ends in ${tail}` : "Hidden"}>••••••••{tail}</span>;
-}
 
 function LmsAccessDeleteButton({ redirect }: { redirect: "list" | false }) {
   const record = useRecordContext();
@@ -67,7 +54,7 @@ export function LmsAccessesList() {
       <TextField source="user.first_name" label="First Name" sortable={false} emptyText="—" />
       <TextField source="user.last_name" label="Last Name" sortable={false} emptyText="—" />
       <TextField source="user.email" label="Email" sortable={false} />
-      <MaskedCredential label="Access Token" hint="access_token_hint" present="has_access_token" />
+      <TextField source="access_token" label="Access Token" sortable={false} emptyText="Not set" />
       <TextField source="consumer_key" label="Consumer Key" sortable={false} emptyText="—" />
       <WrapperField label="Actions">
         <span className="admin-row-actions"><ShowButton /><EditButton /><LmsAccessDeleteButton redirect={false} /></span>
@@ -83,13 +70,13 @@ export function LmsAccessShow() {
     <LmsAccessDeleteButton redirect="list" />
   </TopToolbar>}>
     <SimpleShowLayout>
-      <MaskedCredential label="Access Token" hint="access_token_hint" present="has_access_token" />
+      <TextField source="access_token" label="Access Token" sortable={false} emptyText="Not set" />
       <DateField source="created_at" label="Created At" showTime />
       <DateField source="updated_at" label="Updated At" showTime />
       <FunctionField label="LMS Instance" render={instanceLink} />
       <FunctionField label="User" render={userLink} />
       <TextField source="consumer_key" label="Consumer Key" emptyText="Not set" />
-      <MaskedCredential label="Consumer Secret" hint="consumer_secret_hint" present="has_consumer_secret" />
+      <TextField source="consumer_secret" label="Consumer Secret" emptyText="Not set" />
     </SimpleShowLayout>
   </Show>;
 }

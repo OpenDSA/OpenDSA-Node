@@ -17,11 +17,10 @@ import { adminFeatures } from "./adminFeatures";
 import { LmsAccessesList, LmsAccessShow, LmsAccessEdit, LmsAccessCreate } from "./AdminLmsAccesses";
 import { ErrorsList, ErrorShow } from "./AdminErrors";
 
-// Write-only credentials: dropped from every response before react-admin caches it,
-// even if an endpoint returns them by mistake.
+// Blank credential edits preserve existing values.
 const writeOnlyFields: Record<string, string[]> = { "lms-accesses": ["access_token", "consumer_secret"] };
 function withoutSecrets<T>(resource: string, body: T): T {
-  const hidden = writeOnlyFields[resource];
+  const hidden = resource === "lms-accesses" ? undefined : writeOnlyFields[resource];
   const data = (body as { data?: unknown } | null)?.data;
   if (!hidden || !data) return body;
   const strip = (record: unknown) => record && typeof record === "object"

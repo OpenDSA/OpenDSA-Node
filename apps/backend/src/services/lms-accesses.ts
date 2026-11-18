@@ -7,17 +7,13 @@ export const isLmsAccessAdministrator = (user: Actor) => user.global_role.name =
 export const canManageOwnLmsAccess = (user: Actor) => isLmsAccessAdministrator(user) || ["Instructor", "Researcher"].includes(user.global_role.name);
 export const lmsAccessScope = (user: Actor): Prisma.LmsAccessesWhereInput => isLmsAccessAdministrator(user) ? {} : { user_id: user.id };
 const userSelect = { id: true, first_name: true, last_name: true, email: true } as const;
-// Tokens are selected only to compute presence/hints; never serialize this shape directly.
+// This projection is available only to administrators or the credential owner.
 const accessSelect = { id: true, user_id: true, lms_instance_id: true, consumer_key: true,
   access_token: true, consumer_secret: true, created_at: true, updated_at: true,
   user: { select: userSelect }, lms_instance: { select: { id: true, url: true } } } as const;
 type Access = Prisma.LmsAccessesGetPayload<{ select: typeof accessSelect }>;
 export function publicLmsAccess(record: Access) {
-  const { access_token, consumer_secret, ...safe } = record;
-  // Do not expose the entire value when a short legacy credential is present.
-  const hint = (value: string | null) => value && value.length > 4 ? value.slice(-4) : null;
-  return { ...safe, has_access_token: !!access_token, access_token_hint: hint(access_token),
-    has_consumer_secret: !!consumer_secret, consumer_secret_hint: hint(consumer_secret) };
+  return record;
 }
 export function accessId(value: unknown, label = "ID") {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0 || value > 2147483647) throw new AdminRecordError(400, `${label} must be a positive integer.`);

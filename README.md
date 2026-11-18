@@ -191,4 +191,4 @@ metrics; failed logins and session restoration do not update them. New signup
 and LTI accounts receive creation/update timestamps; missing historical dates
 are not backfilled.
 
-LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Tokens and consumer secrets are write-only (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.
+LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Authorized users can view stored tokens and consumer secrets (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.
