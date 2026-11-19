@@ -140,10 +140,24 @@ main:has(.admin-shell) {
 }
 
 /* Keep full LMS credentials on one line; scroll the list and filters together. */
-.admin-content:has(.admin-lms-accesses) { overflow-x: auto; }
-.admin-shell .admin-lms-accesses { width: max-content; min-width: 100%; gap: 24px; align-items: flex-start; }
-.admin-shell .admin-lms-accesses .RaList-main { flex: 1 0 auto; }
-.admin-shell .admin-lms-accesses .RaList-content { overflow: visible; }
-.admin-shell .admin-lms-accesses th,
-.admin-shell .admin-lms-accesses td { white-space: nowrap; }
-.admin-shell .admin-lms-accesses .admin-filters { flex: 0 0 260px; }
+.admin-content:has(.admin-lms-accesses, .admin-learning-tools) { overflow-x: auto; }
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) { width: max-content; min-width: 100%; gap: 24px; align-items: flex-start; }
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) .RaList-main { flex: 1 0 auto; }
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) .RaList-content { overflow: visible; }
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) th,
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) td { white-space: nowrap; }
+.admin-shell :is(.admin-lms-accesses, .admin-learning-tools) .admin-filters { flex: 0 0 260px; }
+
+.admin-related { padding: 20px; min-width: 0; }
+.admin-related-offering { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; }
+.admin-related-offering > * { min-width: 0; }
+.admin-related-panel { border: 1px solid #cbd3dc; border-radius: 6px; overflow: hidden; margin-bottom: 20px; background: #fff; }
+.admin-related-panel h2 { margin: 0; padding: 10px 14px; background: #e8edf2; color: #263746; font-size: 16px; }
+.admin-related-panel p { margin: 14px; }
+.admin-related-scroll { overflow-x: auto; }
+.admin-related-panel table { width: 100%; border-collapse: collapse; text-align: left; color: #202b36; }
+.admin-related-panel th, .admin-related-panel td { padding: 12px 14px; border-bottom: 1px solid #dce2e8; overflow-wrap: anywhere; }
+.admin-related-panel th { background: #f3f5f7; }
+.admin-related-panel tbody tr:nth-child(even) { background: #f5f7fa; }
+.admin-related-panel a, .admin-related-panel a:visited { color: #175c91; }
+@media (max-width: 1000px) { .admin-related-offering { grid-template-columns: minmax(0, 1fr); } }

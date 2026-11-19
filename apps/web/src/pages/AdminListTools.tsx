@@ -5,6 +5,7 @@ import { canAccessAdmin, useAuth } from "../auth/Auth";
 
 // [plural, singular] labels used by the page header and breadcrumbs.
 export const adminResourceLabels: Record<string, [string, string]> = {
+  "learning-tools": ["Learning Tools", "Learning Tool"],
   organizations: ["Organizations", "Organization"], terms: ["Terms", "Term"],
   courses: ["Courses", "Course"], "course-offerings": ["Course Offerings", "Course Offering"],
   "course-roles": ["Course Roles", "Course Role"], roles: ["Global Roles", "Global Role"],

@@ -42,7 +42,8 @@ test("admin namespace denies non-administrators and rechecks role changes on eve
         assert.equal(detail.status, 200);
         const record = (await detail.json()).data;
         checkSafe(record);
-        assert.deepEqual(record, result.data[0]);
+        // Detail pages add related records; all list fields must still match.
+        for (const key of Object.keys(result.data[0])) assert.deepEqual(record[key], result.data[0][key]);
       }
       for (const query of ["per_page=101", "sort=encrypted_password", "page=0", "order=invalid"]) {
         assert.equal((await fetch(`${base}/api/admin/${resource}?${query}`, { headers: administrator })).status, 400);

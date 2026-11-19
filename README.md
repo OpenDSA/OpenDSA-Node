@@ -192,3 +192,5 @@ and LTI accounts receive creation/update timestamps; missing historical dates
 are not backfilled.
 
 LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Authorized users can view stored tokens and consumer secrets (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.
+
+Learning Tools is available under **LMS Config → Learning Tools** (`/admin/learning-tools`). Administrators can list, search, view, create, edit, and delete tool configurations with required name, key, secret, and launch URL, matching the Rails fields. Credentials are visible to administrators; deletion removes the configuration without deleting book content.
