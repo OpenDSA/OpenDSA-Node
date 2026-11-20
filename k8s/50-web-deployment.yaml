@@ -17,7 +17,7 @@ spec:
         - name: opendsa-registry
       containers:
         - name: web
-          image: container.cs.vt.edu/jaden/opendsa-node/web:textbook-479d622
+          image: container.cs.vt.edu/jaden/opendsa-node/web:books-31ce5cc
           ports:
             - containerPort: 80
           readinessProbe:

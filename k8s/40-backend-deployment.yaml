@@ -36,7 +36,7 @@ spec:
             claimName: opendsa-books
       containers:
         - name: backend
-          image: container.cs.vt.edu/jaden/opendsa-node/backend:lms-access-64177af
+          image: container.cs.vt.edu/jaden/opendsa-node/backend:books-31ce5cc
           ports:
             - containerPort: 3000
           env:
