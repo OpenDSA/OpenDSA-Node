@@ -2,6 +2,8 @@ import { apiFetch } from "../auth/api";
 import { authFetch } from "../auth/Auth";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import StandaloneCompilation from "./StandaloneCompilation";
+import "./standalone-compilation.css";
 
 interface Offering {
   standalone: boolean;
@@ -45,6 +47,8 @@ export default function CourseOffering() {
     } catch (error) { setError(error instanceof Error ? error.message : "Generation failed."); }
     finally { inFlight.current = false; setGenerating(false); }
   }
+
+  if (offering?.standalone) return <StandaloneCompilation offering={offering} generating={generating} bookUrl={bookUrl} error={error} onCompile={generate} />;
 
   return <div>
     <h1>{offering?.standalone ? "Textbook" : "Course Offering"}</h1>

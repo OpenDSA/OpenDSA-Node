@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import React, { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, useGetOne, useNotify, useRefresh, useRecordContext, type RaRecord } from "react-admin";
 import { authFetch } from "../auth/Auth";
 
 export function UpdateBookConfigButton() {
   const record = useRecordContext();
-  return record ? <Button label="Update Configuration" to={`/admin/books/${record.id}/update-configuration`} /> : null;
+  return record ? <Button component={Link} label="Update Configuration" onClick={event => event.stopPropagation()} to={`/admin/books/${record.id}/update-configuration`} /> : null;
 }
 
 export default function AdminBookUpload() {
