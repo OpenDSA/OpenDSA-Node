@@ -52,7 +52,7 @@ test("admin namespace denies non-administrators and rechecks role changes on eve
         assert.equal((await fetch(`${base}/api/admin/${resource}`, { method, headers: administrator })).status, editable.includes(resource) && method === "POST" ? 400 : 405);
       }
       for (const method of ["PATCH", "DELETE"]) {
-        assert.equal((await fetch(`${base}/api/admin/${resource}/1`, { method, headers: administrator })).status, (editable.includes(resource) || resource === "users") && method === "PATCH" ? 400 : 405);
+        assert.equal((await fetch(`${base}/api/admin/${resource}/1`, { method, headers: administrator })).status, (editable.includes(resource) || resource === "users" || resource === "books") && method === "PATCH" ? 400 : 405);
       }
       assert.equal((await fetch(`${base}/api/admin/${resource}/2147483647`, { headers: administrator })).status, 404);
       assert.equal((await fetch(`${base}/api/admin/${resource}/invalid`, { headers: administrator })).status, 400);

@@ -5,6 +5,7 @@ import { INSTRUCTOR_COURSE_ROLE_ID, STUDENT_COURSE_ROLE_ID } from "../services/c
 import { lmsInstanceAdminSelect } from "../services/lms-instance-config";
 import { editableAdminResources, saveAdminRecord, adminRecordError } from "../services/admin-records";
 import { prisma } from "../db";
+import { cloneBook } from "../services/clone-book";
 
 export const adminRouter = Router();
 adminRouter.use((_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
@@ -220,6 +221,38 @@ adminRouter.delete("/learning-tools/:id", requireCsrf, async (req, res, next) =>
   }
 });
 
+adminRouter.post("/books/:id/clone", requireCsrf, async (req, res, next) => {
+  if (!/^[1-9]\d*$/.test(String(req.params.id)) || Number(req.params.id) > 2147483647) {
+    res.status(400).json({ error: "Invalid record ID." }); return;
+  }
+  if (req.body !== undefined && (!req.body || typeof req.body !== "object" || Array.isArray(req.body) || Object.keys(req.body).length)) {
+    res.status(400).json({ error: "Cloning does not accept additional fields." }); return;
+  }
+  try {
+    const data = await prisma.$transaction(async tx => {
+      const id = await cloneBook(tx, Number(req.params.id), null, req.user!.id);
+      return tx.instBooks.findUniqueOrThrow({ where: { id }, select: { id: true, title: true } });
+    }, { timeout: 30000 });
+    res.status(201).json({ data });
+  } catch (error) {
+    const result = adminRecordError(error);
+    if (result) { res.status(result.status).json({ error: result.error }); return; }
+    next(error);
+  }
+});
+
+adminRouter.patch("/books/:id", requireCsrf, async (req, res, next) => {
+  if (!/^[1-9]\d*$/.test(String(req.params.id)) || Number(req.params.id) > 2147483647) {
+    res.status(400).json({ error: "Invalid record ID." }); return;
+  }
+  try { res.json({ data: await saveAdminRecord("books", req.body, req.user!.id, Number(req.params.id)) }); }
+  catch (error) {
+    const result = adminRecordError(error);
+    if (result) { res.status(result.status).json({ error: result.error }); return; }
+    next(error);
+  }
+});
+
 for (const resource of editableAdminResources) {
   for (const method of ["post", "patch"] as const) {
     adminRouter[method](method === "post" ? `/${resource}` : `/${resource}/:id`, requireCsrf, async (req, res, next) => {
@@ -320,7 +353,7 @@ for (const resource of ["organizations", "terms", "courses", "course-offerings",
   });
   adminRouter.all([`/${resource}`, `/${resource}/:id`], (_req, res) => {
     const editable = (editableAdminResources as readonly string[]).includes(resource);
-    res.set("Allow", _req.params.id ? (resource === "learning-tools" ? "GET, HEAD, PATCH, DELETE" : editable || resource === "users" ? "GET, HEAD, PATCH" : "GET, HEAD") :
+    res.set("Allow", _req.params.id ? (resource === "learning-tools" ? "GET, HEAD, PATCH, DELETE" : editable || resource === "users" || resource === "books" ? "GET, HEAD, PATCH" : "GET, HEAD") :
       (editable ? "GET, HEAD, POST" : "GET, HEAD")).status(405).json({ error: "This operation is not supported." });
   });
 }

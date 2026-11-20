@@ -11,7 +11,7 @@ export const adminResourceLabels: Record<string, [string, string]> = {
   "course-roles": ["Course Roles", "Course Role"], roles: ["Global Roles", "Global Role"],
   "late-policies": ["Late Policies", "Late Policy"], "lms-types": ["LMS Types", "LMS Type"],
   "lms-instances": ["LMS Instances", "LMS Instance"], "lms-accesses": ["LMS Accesses", "LMS Access"],
-  books: ["Inst Books", "Inst Book"], users: ["Users", "User"], errors: ["Errors", "Error"],
+  books: ["Inst Books", "Inst Book"], users: ["Users", "User"],
 };
 
 type Crumb = { label: string; to: string };
@@ -26,6 +26,8 @@ function headerFor(pathname: string): { title: string; crumbs: Crumb[] } | null 
   const [plural, singular] = labels;
   const list = { label: plural, to: `/admin/${parts[0]}` };
   if (parts.length === 1) return { title: plural, crumbs: [admin] };
+  if (parts[0] === "books" && parts[1] === "upload") return { title: "Upload Books", crumbs: [admin, list] };
+  if (parts[0] === "books" && parts[2] === "update-configuration") return { title: "Update Book Configuration", crumbs: [admin, list, { label: `Book #${parts[1]}`, to: `/admin/books/${encodeURIComponent(parts[1])}/show` }] };
   if (parts[1] === "create") return { title: `New ${singular}`, crumbs: [admin, list] };
   if (parts[2] === "show") return { title: `${singular} #${parts[1]}`, crumbs: [admin, list] };
   return { title: `Edit ${singular}`, crumbs: [admin, list, { label: `${singular} #${parts[1]}`, to: `/admin/${parts[0]}/${encodeURIComponent(parts[1])}/show` }] };
@@ -116,5 +118,5 @@ export function AdminList({ filters, searchPlaceholder, validateFilters, childre
   Omit<ListProps, "filters" | "aside"> & { filters?: FilterField[]; searchPlaceholder?: string;
     validateFilters?: (values: Record<string, string>) => string | undefined; children: ReactNode }) {
   const fields = filters ?? [{ source: "q", label: "Search", placeholder: searchPlaceholder }];
-  return <List exporter={false} {...props} aside={<AdminFilterPanel fields={fields} validate={validateFilters} />}>{children}</List>;
+  return <List exporter={false} {...props} className={["admin-list", props.className].filter(Boolean).join(" ")} aside={<AdminFilterPanel fields={fields} validate={validateFilters} />}>{children}</List>;
 }

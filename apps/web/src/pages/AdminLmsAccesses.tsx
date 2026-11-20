@@ -42,7 +42,7 @@ const userLink = (record: RaRecord) => <UserValue record={record} />;
 
 export function LmsAccessesList() {
   const { user } = useAuth();
-  return <AdminList className="admin-lms-accesses" sort={{ field: "id", order: "ASC" }} filters={[
+  return <AdminList sort={{ field: "id", order: "ASC" }} filters={[
     ...(canAccessAdmin(user) ? [{ source: "email", label: "Email", placeholder: "User email" }] : []),
     { source: "lms_instance_id", label: "LMS instance", type: "select", reference: "lms-access-instances",
       referenceSort: "url", optionText: record => String(record.url) },

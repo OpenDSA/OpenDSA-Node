@@ -9,7 +9,7 @@ function DeleteTool({ redirect }: { redirect: "list" | false }) {
     confirmContent="This removes the tool configuration and its credentials. Existing content that uses this tool may stop working. This cannot be undone." />;
 }
 export function LearningToolsList() {
-  return <AdminList className="admin-learning-tools" sort={{ field: "created_at", order: "ASC" }} searchPlaceholder="Name, key, or launch URL">
+  return <AdminList sort={{ field: "created_at", order: "ASC" }} searchPlaceholder="Name, key, or launch URL">
     <Datagrid rowClick="show" bulkActionButtons={false}>
       <TextField source="id" /><TextField source="name" /><TextField source="key" />
       <TextField source="secret" sortable={false} /><TextField source="launch_url" label="Launch URL" />

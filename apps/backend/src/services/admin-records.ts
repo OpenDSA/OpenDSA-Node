@@ -5,12 +5,13 @@ import { ensureBuiltinCourseRole } from "./course-roles";
 import { prisma } from "../db";
 
 export const editableAdminResources = ["organizations", "terms", "courses", "course-offerings", "course-roles", "late-policies", "lms-types", "lms-instances", "learning-tools"] as const;
-export type EditableAdminResource = typeof editableAdminResources[number];
+export type EditableAdminResource = typeof editableAdminResources[number] | "books";
 export class AdminRecordError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 const fail = (message: string): never => { throw new AdminRecordError(400, message); };
 const fields: Record<EditableAdminResource, string[]> = {
+  books: ["title", "desc", "user_id", "course_offering_id", "template", "book_type"],
   organizations: ["name", "abbreviation"],
   terms: ["season", "year", "starts_on", "ends_on"],
   courses: ["name", "number", "organization_id", "user_id"],
@@ -26,7 +27,7 @@ export function parseAdminBody(resource: EditableAdminResource, body: unknown) {
   if (!body || typeof body !== "object" || Array.isArray(body) || !Object.keys(body).length ||
       Object.keys(body).some(key => !fields[resource].includes(key))) fail("Submit only the editable fields for this resource.");
   for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
-    if (value === null && key !== "lms_course_code" && !(resource === "lms-instances" && !["url", "lms_type_id", "organization_id"].includes(key))) fail(`${key} cannot be null.`);
+    if (value === null && !(resource === "books" && ["desc", "course_offering_id", "book_type"].includes(key)) && key !== "lms_course_code" && !(resource === "lms-instances" && !["url", "lms_type_id", "organization_id"].includes(key))) fail(`${key} cannot be null.`);
   }
   return body as Record<string, unknown>;
 }
@@ -59,6 +60,26 @@ export async function saveAdminRecord(resource: EditableAdminResource, body: unk
     const now = new Date();
     // Existing slugs are retained when their source field is unchanged.
     switch (resource) {
+      case "books": {
+        if (!recordId) throw new AdminRecordError(405, "Use Upload Books to create a book.");
+        const old = await tx.instBooks.findUnique({ where: { id: recordId } });
+        if (!old) throw new AdminRecordError(404, "Book not found.");
+        const title = text(input.title ?? old.title, "Title");
+        if ([...title].length > 50) fail("Title must be at most 50 characters.");
+        const desc = "desc" in input ? input.desc : old.desc;
+        if (desc !== null && (typeof desc !== "string" || [...desc].length > 255)) fail("Description must be at most 255 characters.");
+        const user_id = "user_id" in input ? id(input.user_id, "Owner") : old.user_id;
+        const course_offering_id = "course_offering_id" in input ? input.course_offering_id === null ? null : id(input.course_offering_id, "Offering") : old.course_offering_id;
+        const requestedTemplate = "template" in input ? boolean(input.template, "Template") : old.template;
+        const template = course_offering_id !== null ? false : requestedTemplate;
+        const book_type = "book_type" in input ? input.book_type === null ? null : integer(input.book_type, "Book type") : old.book_type;
+        if (book_type !== null && ![0, 1].includes(book_type)) fail("Book type must be Complete or Exercises.");
+        if (!await tx.users.findUnique({ where: { id: user_id }, select: { id: true } })) fail("Owner does not exist.");
+        if (course_offering_id !== null && !await tx.courseOfferings.findUnique({ where: { id: course_offering_id }, select: { id: true } })) fail("Offering does not exist.");
+        return tx.instBooks.update({ where: { id: recordId }, data: { title, desc: desc as string | null, user_id, course_offering_id, template, book_type, updated_at: now },
+          select: { id: true, title: true, desc: true, user_id: true, course_offering_id: true, template: true, book_type: true,
+            last_compiled: true, created_at: true, updated_at: true } });
+      }
       case "organizations": {
         const old = recordId ? await tx.organizations.findUnique({ where: { id: recordId } }) : null;
         if (recordId && !old) throw new AdminRecordError(404, "Organization not found.");

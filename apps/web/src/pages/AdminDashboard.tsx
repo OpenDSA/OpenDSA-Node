@@ -1,6 +1,6 @@
 import { apiFetch } from "../auth/api";
 import {
-  Admin, Resource, Datagrid, TextField, NumberField, DateField, Show,
+  Admin, Resource, CustomRoutes, TopToolbar, ListButton, CreateButton, Datagrid, TextField, NumberField, DateField, Show,
   BooleanField, SelectField, SimpleShowLayout, Notification, HttpError,
   Edit, SimpleForm, TextInput, ReferenceField, ReferenceInput, SelectInput, Toolbar, SaveButton,
   EditButton, required, email, maxLength, useNotify, useRedirect,
@@ -9,7 +9,9 @@ import {
 import { useState, type ReactNode } from "react";
 import { LearningToolsList, LearningToolShow } from "./AdminLearningTools";
 import { AdminCreate, AdminEdit, seasons } from "./AdminForms";
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { CloneBookButton } from "./AdminBookActions";
+import AdminBookUpload, { UpdateBookConfigButton } from "./AdminBookUpload";
+import { NavLink, Link, Route, useNavigate } from "react-router-dom";
 import "./admin.css";
 import AdminHome from "./AdminHome";
 import { OrganizationRelated, TermRelated, OfferingRelated } from "./AdminRelatedRecords";
@@ -17,7 +19,6 @@ import { authFetch, canAccessAdmin, useAuth } from "../auth/Auth";
 import { AdminList, AdminPageHeader } from "./AdminListTools";
 import { adminFeatures } from "./adminFeatures";
 import { LmsAccessesList, LmsAccessShow, LmsAccessEdit, LmsAccessCreate } from "./AdminLmsAccesses";
-import { ErrorsList, ErrorShow } from "./AdminErrors";
 
 // Blank credential edits preserve existing values.
 const writeOnlyFields: Record<string, string[]> = { "lms-accesses": ["access_token", "consumer_secret"] };
@@ -31,7 +32,7 @@ function withoutSecrets<T>(resource: string, body: T): T {
 }
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
-  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "lms-access-instances", "learning-tools", "errors"].includes(resource)) throw new Error("Unknown resource.");
+  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "lms-access-instances", "learning-tools"].includes(resource)) throw new Error("Unknown resource.");
   const path = resource === "lms-access-instances" ? "lms-accesses/options/lms-instances" : resource;
   const response = await apiFetch(`/api/admin/${path}${suffix}`);
   const body = await response.json();
@@ -41,9 +42,9 @@ async function read(resource: string, suffix: string) {
 // Field filters beyond `q`; existing endpoints reject unknown query parameters, so these are per resource.
 const listFilters: Record<string, string[]> = {
   "lms-accesses": ["email", "lms_instance_id", "user_id"],
-  errors: ["class_name", "message", "created_from", "created_to"],
 };
 const editableFields: Record<string, string[]> = {
+  books: ["title", "desc", "user_id", "course_offering_id", "template", "book_type"],
   users: ["first_name", "last_name", "email", "global_role_id"],
   organizations: ["name", "abbreviation"], terms: ["season", "year", "starts_on", "ends_on"],
   courses: ["name", "number", "organization_id", "user_id"],
@@ -56,7 +57,7 @@ const editableFields: Record<string, string[]> = {
   "learning-tools": ["name", "key", "secret", "launch_url"],
 };
 async function write(resource: string, data: Record<string, unknown>, id?: string | number) {
-  if (!editableFields[resource] || (resource === "users" && id === undefined)) throw new Error("This operation is not supported.");
+  if (!editableFields[resource] || (["users", "books"].includes(resource) && id === undefined)) throw new Error("This operation is not supported.");
   // A blank write-only credential means "keep the current value", so it is not sent.
   const input = Object.fromEntries(editableFields[resource].filter(key => key in data &&
     !(writeOnlyFields[resource]?.includes(key) && (data[key] == null || data[key] === ""))).map(key =>
@@ -137,7 +138,7 @@ function AdminLayout({ children }: LayoutProps) {
         <NavLink to="/admin/books">Book Instances</NavLink>
       </AdminDropdown>
       <NavLink to="/admin/users">Users</NavLink>
-      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}</>}
+      </>}
       <Link to="/profile" className="admin-user">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email}</Link>
       <button type="button" onClick={signOut}>Sign out</button>
     </nav>
@@ -223,21 +224,22 @@ function BooksList() {
   return( 
   // The "Admin / Inst Books" header is rendered by AdminPageHeader in the layout.
   <div className="admin-books-page">
-    <AdminList searchPlaceholder="Book title" sort={{ field: "title", order: "ASC" }}>
+    <AdminList searchPlaceholder="Book title" sort={{ field: "title", order: "ASC" }} actions={<TopToolbar><CreateButton label="Upload Books" to="/admin/books/upload" /></TopToolbar>}>
       <Datagrid rowClick="show" bulkActionButtons={false}>
         <TextField source="id" /><TextField source="title" /><BooleanField source="template" />
         <TextField source="user.email" label="Owner" sortable={false} />
         <TextField source="course_offering.label" label="Offering" sortable={false} />
         <DateField source="last_compiled" showTime emptyText="Not compiled" />
+        <EditButton /><CloneBookButton /><UpdateBookConfigButton />
       </Datagrid>
     </AdminList>
   </div>
   )
 }
 function BookShow() {
-  return <Show actions={false}><SimpleShowLayout>
+  return <Show actions={<TopToolbar><ListButton /><EditButton /><CloneBookButton /><UpdateBookConfigButton /></TopToolbar>}><SimpleShowLayout>
     <TextField source="id" /><TextField source="title" /><TextField source="desc" label="Description" />
-    <BooleanField source="template" /><TextField source="book_type" />
+    <BooleanField source="template" /><SelectField source="book_type" choices={[{ id: 0, name: "Complete" }, { id: 1, name: "Exercises" }]} emptyText="—" />
     <ReferenceField source="user_id" reference="users" label="Owner" link="show" emptyText="—"><TextField source="email" /></ReferenceField>
     <ReferenceField source="course_offering_id" reference="course-offerings" label="Offering" link="show" emptyText="—"><TextField source="label" /></ReferenceField>
     <DateField source="last_compiled" showTime emptyText="Not compiled" />
@@ -351,6 +353,10 @@ export default function AdminDashboard() {
       background: { default: "#f4f6f8", paper: "#ffffff" }, text: { primary: "#202b36", secondary: "#4b5968" } },
       typography: { fontFamily: "Arial, Helvetica, sans-serif" } }} darkTheme={null} title="OpenDSA Administration">
     {administrator && <>
+    <CustomRoutes>
+      <Route path="books/upload" element={<AdminBookUpload />} />
+      <Route path="books/:id/update-configuration" element={<AdminBookUpload />} />
+    </CustomRoutes>
     <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="terms" list={TermsList} show={TermShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="courses" list={CoursesList} show={CourseShow} create={AdminCreate} edit={AdminEdit} />
@@ -360,12 +366,11 @@ export default function AdminDashboard() {
     <Resource name="learning-tools" options={{ label: "Learning Tools" }} list={LearningToolsList} show={LearningToolShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-types" options={{ label: "LMS Types" }} list={LmsTypesList} show={LmsTypeShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-instances" options={{ label: "LMS Instances" }} list={LmsInstancesList} show={LmsInstanceShow} create={AdminCreate} edit={AdminEdit} />
-    <Resource name="books" options={{ label: "Book Instances" }} list={BooksList} show={BookShow} />
+    <Resource name="books" options={{ label: "Book Instances" }} list={BooksList} show={BookShow} edit={AdminEdit} />
     <Resource name="users" list={UsersList} show={UserShow} edit={UserEdit} />
     <Resource name="roles" options={{ label: "Global Roles" }} list={RolesList} show={RoleShow} />
     </>}
     {adminFeatures.lmsAccesses && <Resource name="lms-accesses" options={{ label: "LMS Accesses" }}
       list={LmsAccessesList} show={LmsAccessShow} create={LmsAccessCreate} edit={LmsAccessEdit} />}
-    {administrator && adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
   </Admin>;
 }

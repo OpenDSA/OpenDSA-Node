@@ -209,3 +209,7 @@ are not backfilled.
 LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Authorized users can view stored tokens and consumer secrets (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.
 
 Learning Tools is available under **LMS Config → Learning Tools** (`/admin/learning-tools`). Administrators can list, search, view, create, edit, and delete tool configurations with required name, key, secret, and launch URL, matching the Rails fields. Credentials are visible to administrators; deletion removes the configuration without deleting book content.
+
+In **OpenDSA Books → Book Instances**, use **Upload Books** to import a JSON configuration as a template, or **Update Configuration** to apply a file to an existing book. Confirm the selected file before saving. Updates retain omitted content and require recompilation; neither action compiles or contacts Canvas.
+
+Book Instances also supports administrator metadata edits for title, description, owner, offering, template status, and Complete/Exercises type. A book linked to an offering cannot be a template. Metadata edits do not compile or synchronize Canvas.

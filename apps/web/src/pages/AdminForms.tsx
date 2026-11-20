@@ -13,6 +13,14 @@ function RecordInputs() {
   const resource = useResourceContext();
   const record = useRecordContext();
   switch (resource) {
+    case "books": return <>
+      {!record?.template && <ReferenceInput source="course_offering_id" reference="course-offerings"><AutocompleteInput label="Course offering" optionText="label" /></ReferenceInput>}
+      <ReferenceInput source="user_id" reference="users"><AutocompleteInput label="Owner" optionText="email" validate={required()} /></ReferenceInput>
+      {record?.course_offering_id == null && <BooleanInput source="template" />}
+      <SelectInput source="book_type" choices={[{ id: 0, name: "Complete" }, { id: 1, name: "Exercises" }]} />
+      <TextInput source="title" validate={[required(), maxLength(50)]} />
+      <TextInput source="desc" label="Description" multiline validate={maxLength(255)} />
+    </>;
     case "organizations": return <>
       <TextInput source="name" validate={textValidation} /><TextInput source="abbreviation" validate={textValidation} />
     </>;

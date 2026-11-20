@@ -2,14 +2,16 @@ import { Prisma } from "@prisma/client";
 
 // Copy configuration only: shared definitions remain shared; LMS IDs, attempt
 // state and student progress must never be copied into a new offering.
-export async function cloneBook(tx: Prisma.TransactionClient, sourceId: number, offeringId: number, userId: number) {
+// A null offering selects the Rails admin clone behavior: an unlinked copy,
+// leaving book type and module due dates at their defaults.
+export async function cloneBook(tx: Prisma.TransactionClient, sourceId: number, offeringId: number | null, userId: number) {
   const source = await tx.instBooks.findUniqueOrThrow({ where: { id: sourceId }, include: {
     inst_chapters: { include: { inst_chapter_modules: { include: {
       inst_sections: { include: { inst_book_section_exercises: true } },
     } } } },
   } });
   const book = await tx.instBooks.create({ data: {
-    title: source.title, desc: source.desc, options: source.options, book_type: source.book_type,
+    title: source.title, desc: source.desc, options: source.options, book_type: offeringId === null ? undefined : source.book_type,
     user_id: userId, course_offering_id: offeringId, template: false, created_at: new Date(),
   } });
   for (const chapter of source.inst_chapters) {
@@ -19,7 +21,7 @@ export async function cloneBook(tx: Prisma.TransactionClient, sourceId: number, 
     for (const module of chapter.inst_chapter_modules) {
       const moduleCopy = await tx.instChapterModules.create({ data: {
         inst_chapter_id: copy.id, inst_module_id: module.inst_module_id,
-        module_position: module.module_position, due_dates: module.due_dates,
+        module_position: module.module_position, due_dates: offeringId === null ? undefined : module.due_dates,
       } });
       for (const section of module.inst_sections) {
         const sectionCopy = await tx.instSections.create({ data: {
@@ -36,7 +38,7 @@ export async function cloneBook(tx: Prisma.TransactionClient, sourceId: number, 
           await tx.instBookSectionExercises.create({ data: {
             inst_book_id: book.id, inst_section_id: sectionCopy.id, inst_exercise_id: exercise.inst_exercise_id,
             exercise_instance_id: instance?.id, points: exercise.points, threshold: exercise.threshold,
-            required: exercise.required, type: exercise.type, options: exercise.options,
+            required: exercise.required, type: offeringId === null ? undefined : exercise.type, options: exercise.options,
             partial_credit: exercise.partial_credit, json: exercise.json,
           } });
         }

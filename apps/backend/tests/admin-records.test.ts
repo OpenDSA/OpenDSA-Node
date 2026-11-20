@@ -94,6 +94,24 @@ test("admin create/edit validates admin resources, preserves role identity and a
       await ltiEnroll(studentUser.id, offering.id, false);
       assert.equal((await tx.courseEnrollments.findUniqueOrThrow({ where: { user_id_course_offering_id: { user_id: studentUser.id, course_offering_id: offering.id } } })).course_role_id, 2);
       const book = await tx.instBooks.create({ data: { title: "Admin fixture", user_id: actor.id, course_offering_id: offering.id, last_compiled: new Date() } });
+      assert.equal((await request("books", { title: "Denied" }, book.id, regular)).status, 403);
+      assert.equal((await request("books", { title: "Denied" }, book.id, { Cookie: admin.Cookie })).status, 403);
+      const editedBook = await save("books", { title: "Updated book", desc: "Updated description", user_id: studentUser.id, book_type: 1, template: true }, book.id);
+      assert.equal(editedBook.template, false, "A linked book cannot become a template");
+      assert.equal(editedBook.user_id, studentUser.id);
+      assert.equal(editedBook.book_type, 1);
+      assert.ok(editedBook.last_compiled, "Metadata saves preserve the compilation timestamp like Rails");
+      assert.ok(!("options" in editedBook));
+      const detachedBook = await save("books", { course_offering_id: null, template: true, desc: null, book_type: null }, book.id);
+      assert.equal(detachedBook.course_offering_id, null); assert.equal(detachedBook.template, true);
+      const relinkedBook = await save("books", { course_offering_id: offering.id, template: true }, book.id);
+      assert.equal(relinkedBook.template, false);
+      for (const invalid of [{ title: "" }, { title: "x".repeat(51) }, { desc: "x".repeat(256) }, { user_id: 2147483647 },
+        { course_offering_id: 2147483647 }, { book_type: 2 }, { template: "true" }, { options: "{}" }, { last_compiled: null }]) {
+        assert.equal((await request("books", invalid, book.id)).status, 400);
+      }
+      assert.equal((await request("books", { title: "Missing" }, 2147483647)).status, 404);
+      assert.equal((await request("books", { title: "No creation" })).status, 405);
       const detail = async (resource: string, id: number) => (await (await fetch(`${base}/api/admin/${resource}/${id}`, { headers: admin })).json()).data;
       const organizationDetails = await detail("organizations", org.id);
       assert.deepEqual(organizationDetails.courses, [{ id: course.id, number: course.number, name: "Updated Course" }]);

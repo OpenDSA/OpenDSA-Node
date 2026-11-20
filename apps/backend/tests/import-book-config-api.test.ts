@@ -38,7 +38,7 @@ const fullConfig = {
   },
 };
 
-test("book import API creates and additively updates a template", async () => {
+test("book import API creates, additively updates, and admin-clones a template", async () => {
   assert([undefined, "development", "test"].includes(process.env.NODE_ENV));
 
   const sharedDir = await mkdtemp(path.join(os.tmpdir(), "opendsa-import-api-"));
@@ -76,6 +76,7 @@ test("book import API creates and additively updates a template", async () => {
 
   try {
     const instructor = await signInForTest(base);
+    const admin = await signInForTest(base, "seed-academic-admin@example.com");
     const student = await signInForTest(base, "seed-alice@example.com");
 
     const request = (
@@ -169,6 +170,43 @@ test("book import API creates and additively updates a template", async () => {
               2
             );
 
+            const chapter = await tx.instChapters.findFirstOrThrow({ where: { inst_book_id: bookId } });
+            const module = await tx.instChapterModules.findFirstOrThrow({ where: { inst_chapter_id: chapter.id } });
+            await tx.instChapters.update({ where: { id: chapter.id }, data: { lms_chapter_id: 123, lms_assignment_group_id: 456 } });
+            await tx.instChapterModules.update({ where: { id: module.id }, data: { lms_assignment_id: 789, lms_module_item_id: 987, due_dates: new Date() } });
+            await tx.instBooks.update({ where: { id: bookId }, data: { book_type: 1, last_compiled: new Date() } });
+            const exercises = await tx.instBookSectionExercises.findMany({ where: { inst_book_id: bookId } });
+            await tx.exerciseInstances.update({ where: { id: exercises[0].exercise_instance_id }, data: { state: { old: true } } });
+            const clonePath = `/api/admin/books/${bookId}/clone`;
+            assert.equal((await request(clonePath)).status, 401);
+            assert.equal((await request(clonePath, instructor, {})).status, 403);
+            assert.equal((await request(clonePath, { Cookie: admin.Cookie }, {})).status, 403);
+            assert.equal((await request(clonePath, admin, { user_id: owner.id })).status, 400);
+            const clonedResponse = await request(clonePath, admin, {});
+            assert.equal(clonedResponse.status, 201);
+            const clonedId = (await clonedResponse.json()).data.id;
+            assert.notEqual(clonedId, bookId);
+            const clone = await tx.instBooks.findUniqueOrThrow({ where: { id: clonedId } });
+            const adminUser = await tx.users.findUniqueOrThrow({ where: { email: "seed-academic-admin@example.com" } });
+            assert.equal(clone.user_id, adminUser.id);
+            assert.equal(clone.title, book.title); assert.equal(clone.options, book.options);
+            assert.equal(clone.course_offering_id, null); assert.equal(clone.template, false);
+            assert.equal(clone.book_type, null); assert.equal(clone.last_compiled, null);
+            const clonedChapter = await tx.instChapters.findFirstOrThrow({ where: { inst_book_id: clonedId } });
+            assert.notEqual(clonedChapter.id, chapter.id); assert.equal(clonedChapter.name, chapter.name);
+            assert.equal(clonedChapter.lms_chapter_id, null); assert.equal(clonedChapter.lms_assignment_group_id, null);
+            const clonedModule = await tx.instChapterModules.findFirstOrThrow({ where: { inst_chapter_id: clonedChapter.id } });
+            assert.equal(clonedModule.inst_module_id, module.inst_module_id);
+            assert.equal(clonedModule.lms_assignment_id, null); assert.equal(clonedModule.lms_module_item_id, null);
+            assert.equal(clonedModule.due_dates, null);
+            const clonedExercises = await tx.instBookSectionExercises.findMany({ where: { inst_book_id: clonedId }, include: { exercise_instance: true } });
+            assert.equal(clonedExercises.length, exercises.length);
+            for (const exercise of clonedExercises) {
+              assert.ok(!exercises.some((old: any) => old.exercise_instance_id === exercise.exercise_instance_id));
+              assert.equal(exercise.exercise_instance.state, null);
+            }
+            assert.equal((await tx.instChapters.findUniqueOrThrow({ where: { id: chapter.id } })).lms_chapter_id, 123);
+            assert.equal((await request("/api/admin/books/2147483647/clone", admin, {})).status, 404);
             throw sentinel;
           },
           { timeout: 30000 }
