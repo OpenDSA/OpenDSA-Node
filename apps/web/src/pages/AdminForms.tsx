@@ -62,6 +62,11 @@ function RecordInputs() {
       <TextInput source="platform_oidc_auth_url" label="OIDC authorization URL" validate={maxLength(255)} />
       <TextInput source="issuer" validate={maxLength(255)} />
     </>;
+    case "learning-tools": return <>
+      <TextInput source="name" validate={textValidation} /><TextInput source="key" validate={textValidation} />
+      <TextInput source="secret" autoComplete="off" validate={textValidation} />
+      <TextInput source="launch_url" label="Launch URL" validate={textValidation} />
+    </>;
     case "lms-types": return <TextInput source="name" validate={textValidation} />;
     default: return null;
   }

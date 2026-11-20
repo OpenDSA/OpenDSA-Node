@@ -94,6 +94,17 @@ test("admin create/edit validates admin resources, preserves role identity and a
       await ltiEnroll(studentUser.id, offering.id, false);
       assert.equal((await tx.courseEnrollments.findUniqueOrThrow({ where: { user_id_course_offering_id: { user_id: studentUser.id, course_offering_id: offering.id } } })).course_role_id, 2);
       const book = await tx.instBooks.create({ data: { title: "Admin fixture", user_id: actor.id, course_offering_id: offering.id, last_compiled: new Date() } });
+      const detail = async (resource: string, id: number) => (await (await fetch(`${base}/api/admin/${resource}/${id}`, { headers: admin })).json()).data;
+      const organizationDetails = await detail("organizations", org.id);
+      assert.deepEqual(organizationDetails.courses, [{ id: course.id, number: course.number, name: "Updated Course" }]);
+      const termDetails = await detail("terms", term.id);
+      assert.equal(termDetails.course_offerings[0].id, offering.id);
+      assert.equal(termDetails.course_offerings[0].course.organization.abbreviation, `Updated-${suffix}`);
+      const offeringDetails = await detail("course-offerings", offering.id);
+      assert.equal(offeringDetails.inst_books[0].id, book.id);
+      assert.deepEqual(offeringDetails.course_enrollments.map((row: any) => row.course_role_id).sort(), [1, 2]);
+      assert.equal(offeringDetails.course_enrollments.find((row: any) => row.course_role_id === 2).user.id, studentUser.id);
+      assert.ok(offeringDetails.course_enrollments.every((row: any) => !("encrypted_password" in row.user)));
       await save("course-offerings", { label: "Changed section", archived: true }, offering.id);
       assert.equal((await tx.instBooks.findUniqueOrThrow({ where: { id: book.id } })).last_compiled, null);
       assert.equal((await tx.courseEnrollments.count({ where: { course_offering_id: offering.id } })), 2);

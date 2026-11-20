@@ -4,7 +4,7 @@ import { lmsKeypair, lmsInstanceAdminSelect } from "./lms-instance-config";
 import { ensureBuiltinCourseRole } from "./course-roles";
 import { prisma } from "../db";
 
-export const editableAdminResources = ["organizations", "terms", "courses", "course-offerings", "course-roles", "late-policies", "lms-types", "lms-instances"] as const;
+export const editableAdminResources = ["organizations", "terms", "courses", "course-offerings", "course-roles", "late-policies", "lms-types", "lms-instances", "learning-tools"] as const;
 export type EditableAdminResource = typeof editableAdminResources[number];
 export class AdminRecordError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -18,6 +18,7 @@ const fields: Record<EditableAdminResource, string[]> = {
   "course-roles": ["name", "can_manage_course", "can_manage_assignments", "can_grade_submissions", "can_view_other_submissions"],
   "late-policies": ["name", "late_days", "late_percent"],
   "lms-types": ["name"],
+  "learning-tools": ["name", "key", "secret", "launch_url"],
   "lms-instances": ["url", "lms_type_id", "organization_id", "consumer_key", "consumer_secret", "client_id",
     "private_key", "public_key", "keyset_url", "oauth2_url", "platform_oidc_auth_url", "issuer"],
 };
@@ -177,6 +178,14 @@ export async function saveAdminRecord(resource: EditableAdminResource, body: unk
           client_id, keyset_url, oauth2_url, platform_oidc_auth_url, issuer, ...keys, updated_at: now };
         return recordId ? tx.lmsInstances.update({ where: { id: recordId }, data, select: lmsInstanceAdminSelect }) :
           tx.lmsInstances.create({ data: { ...data, created_at: now }, select: lmsInstanceAdminSelect });
+      }
+      case "learning-tools": {
+        const old = recordId ? await tx.learningTools.findUnique({ where: { id: recordId } }) : null;
+        if (recordId && !old) throw new AdminRecordError(404, "Learning tool not found.");
+        const data = { name: text(input.name ?? old?.name, "Name"), key: text(input.key ?? old?.key, "Key"),
+          secret: text(input.secret ?? old?.secret, "Secret"), launch_url: text(input.launch_url ?? old?.launch_url, "Launch URL"), updated_at: now };
+        return recordId ? tx.learningTools.update({ where: { id: recordId }, data }) :
+          tx.learningTools.create({ data: { ...data, created_at: now } });
       }
       case "lms-types": {
         const old = recordId ? await tx.lmsTypes.findUnique({ where: { id: recordId } }) : null;

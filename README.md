@@ -176,7 +176,7 @@ Plan to use Prisma as an ORM
    npx prisma studio
    ```
 
-The course-offering form follows the legacy save-then-generate flow: Submit creates or reuses an offering matching course, term, label, and LMS instance, then opens its details page. Reused offerings keep their existing book and Canvas course ID; a different label may target the same Canvas course. Only the separate **Generate Canvas Course** button and confirmation invoke Canvas synchronization and compilation. Local generation uses the signed-in instructor’s Canvas API token without LTI registration; direct book links do not provide student authentication or grade return. The **Create New Textbook** form saves a standalone offering using `TEXTBOOK` (or the existing `seed-TEXTBOOK` alias), clones the selected book, and assigns the signed-in instructor; it does not compile or contact Canvas.
+The course-offering form follows the legacy save-then-generate flow: Submit creates or reuses an offering matching course, term, label, and LMS instance, then opens its details page. Reused offerings keep their existing book and Canvas course ID; a different label may target the same Canvas course. Only the separate **Generate Canvas Course** button and confirmation invoke Canvas synchronization and compilation. Local generation uses the signed-in instructor’s Canvas API token without LTI registration; direct book links do not provide student authentication or grade return. The **Create New Textbook** form saves a standalone offering using `TEXTBOOK` (or the existing `seed-TEXTBOOK` alias), clones the selected book, and assigns the signed-in instructor; the resulting details page offers **Compile Textbook**, which compiles it without Canvas and returns an **Open compiled book** link.
 
 Password login is available at `/login` using Passport and encrypted `iron-session` cookies with an eight-hour login lifetime. Set a stable `SESSION_SECRET` (at least 32 characters) to preserve logins across backend restarts; logout clears the browser cookie, while copied cookies remain usable until expiry. Set your own `SEED_AUTH_PASSWORD` in the ignored backend `.env` and rerun the seed to initialize empty staff passwords, then sign in as `seed-academic-instructor@example.com` or `seed-academic-admin@example.com`. Optional `PASSWORD_PEPPER` matches Devise's password-plus-pepper bcrypt hashing (cost 10); seed and login must use the same value. Setting or changing it requires resetting existing test passwords; the seed never overwrites existing hashes. Bcrypt uses only the first 72 bytes of the combined password and pepper. Creation and generation use the signed-in user's permissions/Canvas credentials. Production requires a configured session secret and HTTPS; set `TRUST_PROXY_HOPS=1` only for the direct trusted ingress path (0 locally). See [Discovery auth setup](k8s/README.md#password-authentication). The signup API (`POST /api/auth/signup`) accepts `email`, `password`, and `password_confirmation`, requires CSRF, and creates a Regular User with automatic login; password reset, remember-me, and legacy account migration remain deferred.
 
@@ -184,7 +184,7 @@ Sign up at `/signup`; successful signup opens `/profile` to edit first name, las
 
 The administrator dashboard at `/admin` uses React-admin to browse Organizations,
 Terms, Courses, Course Offerings, Books, Users, and Global Roles from the database, with sorting, pagination, and record details. These
-screens and their `/api/admin` endpoints require administrator access. Administrators
+screens and their `/api/admin` endpoints require administrator access, except LMS Accesses as described below. Administrators
 can create/edit Organizations, Terms, Courses, Course Offerings, Course Roles,
 Late Policies, LMS Types, and LMS Instances, and edit users’ names, email, and assigned global
 role. Offering creation enrolls the creator as instructor; offering edits clear
@@ -205,3 +205,7 @@ On the first login both timestamps match. The admin Users screen displays these
 metrics; failed logins and session restoration do not update them. New signup
 and LTI accounts receive creation/update timestamps; missing historical dates
 are not backfilled.
+
+LMS Accesses supports listing, viewing, creating, editing, and deleting credentials. Administrators manage all records; instructors/researchers manage only their own at `/admin/lms-accesses`. Authorized users can view stored tokens and consumer secrets (blank edits preserve them), each user/LMS pair is unique, and deletion is blocked when student progress references the access. Saving credentials does not contact Canvas.
+
+Learning Tools is available under **LMS Config → Learning Tools** (`/admin/learning-tools`). Administrators can list, search, view, create, edit, and delete tool configurations with required name, key, secret, and launch URL, matching the Rails fields. Credentials are visible to administrators; deletion removes the configuration without deleting book content.

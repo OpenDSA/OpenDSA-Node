@@ -2,26 +2,27 @@ import { apiFetch } from "../auth/api";
 import {
   Admin, Resource, Datagrid, TextField, NumberField, DateField, Show,
   BooleanField, SelectField, SimpleShowLayout, Notification, HttpError,
-  Edit, SimpleForm, TextInput, ReferenceInput, SelectInput, Toolbar, SaveButton,
+  Edit, SimpleForm, TextInput, ReferenceField, ReferenceInput, SelectInput, Toolbar, SaveButton,
   EditButton, required, email, maxLength, useNotify, useRedirect,
   type DataProvider, type LayoutProps, type RaRecord, type DeleteParams, type DeleteResult,
 } from "react-admin";
 import { useState, type ReactNode } from "react";
+import { LearningToolsList, LearningToolShow } from "./AdminLearningTools";
 import { AdminCreate, AdminEdit, seasons } from "./AdminForms";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./admin.css";
 import AdminHome from "./AdminHome";
-import { authFetch, useAuth } from "../auth/Auth";
+import { OrganizationRelated, TermRelated, OfferingRelated } from "./AdminRelatedRecords";
+import { authFetch, canAccessAdmin, useAuth } from "../auth/Auth";
 import { AdminList, AdminPageHeader } from "./AdminListTools";
 import { adminFeatures } from "./adminFeatures";
 import { LmsAccessesList, LmsAccessShow, LmsAccessEdit, LmsAccessCreate } from "./AdminLmsAccesses";
 import { ErrorsList, ErrorShow } from "./AdminErrors";
 
-// Write-only credentials: dropped from every response before react-admin caches it,
-// even if an endpoint returns them by mistake.
+// Blank credential edits preserve existing values.
 const writeOnlyFields: Record<string, string[]> = { "lms-accesses": ["access_token", "consumer_secret"] };
 function withoutSecrets<T>(resource: string, body: T): T {
-  const hidden = writeOnlyFields[resource];
+  const hidden = resource === "lms-accesses" ? undefined : writeOnlyFields[resource];
   const data = (body as { data?: unknown } | null)?.data;
   if (!hidden || !data) return body;
   const strip = (record: unknown) => record && typeof record === "object"
@@ -30,8 +31,9 @@ function withoutSecrets<T>(resource: string, body: T): T {
 }
 // Explicit resources and fields keep credentials out of the admin interface.
 async function read(resource: string, suffix: string) {
-  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "errors"].includes(resource)) throw new Error("Unknown resource.");
-  const response = await apiFetch(`/api/admin/${resource}${suffix}`);
+  if (!["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "lms-accesses", "lms-access-instances", "learning-tools", "errors"].includes(resource)) throw new Error("Unknown resource.");
+  const path = resource === "lms-access-instances" ? "lms-accesses/options/lms-instances" : resource;
+  const response = await apiFetch(`/api/admin/${path}${suffix}`);
   const body = await response.json();
   if (!response.ok) throw new HttpError(body.error || "Request failed.", response.status, body);
   return withoutSecrets(resource, body);
@@ -51,6 +53,7 @@ const editableFields: Record<string, string[]> = {
   "lms-instances": ["url", "lms_type_id", "organization_id", "consumer_key", "consumer_secret", "client_id",
     "private_key", "public_key", "keyset_url", "oauth2_url", "platform_oidc_auth_url", "issuer"],
   "lms-accesses": ["lms_instance_id", "user_id", "access_token", "consumer_key", "consumer_secret"],
+  "learning-tools": ["name", "key", "secret", "launch_url"],
 };
 async function write(resource: string, data: Record<string, unknown>, id?: string | number) {
   if (!editableFields[resource] || (resource === "users" && id === undefined)) throw new Error("This operation is not supported.");
@@ -66,9 +69,9 @@ async function write(resource: string, data: Record<string, unknown>, id?: strin
   return withoutSecrets(resource, body);
 }
 const unsupported = async (): Promise<never> => { throw new Error("This operation is not supported."); };
-// Only LMS accesses can be deleted, and only once the backend endpoint exists.
+// Only resources with an implemented delete endpoint can be deleted.
 async function remove<RecordType extends RaRecord>(resource: string, params: DeleteParams<RecordType>): Promise<DeleteResult<RecordType>> {
-  if (resource !== "lms-accesses" || !adminFeatures.lmsAccessDelete) return unsupported();
+  if (resource !== "learning-tools" && (resource !== "lms-accesses" || !adminFeatures.lmsAccessDelete)) return unsupported();
   const response = await authFetch(`/api/admin/${resource}/${encodeURIComponent(params.id)}`, { method: "DELETE" });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new HttpError(body.error || "Unable to delete record.", response.status, body);
@@ -117,23 +120,24 @@ function AdminLayout({ children }: LayoutProps) {
     <nav className="admin-navigation" aria-label="Administration">
       <Link to="/" className="admin-brand">OpenDSA</Link>
       <Link to="/" className="admin-back">← Back to OpenDSA</Link>
-      <NavLink to="/admin" end>Dashboard</NavLink>
-      <AdminDropdown label="University-oriented">
+      {canAccessAdmin(user) && <NavLink to="/admin" end>Dashboard</NavLink>}
+      {canAccessAdmin(user) && <AdminDropdown label="University-oriented">
         {[["organizations", "Organizations"], ["terms", "Terms"], ["courses", "Courses"],
           ["course-offerings", "Course Offerings"], ["course-roles", "Course Roles"],
           ["roles", "Global Roles"], ["late-policies", "Late Policies"]].map(([path, label]) =>
           <NavLink key={path} to={`/admin/${path}`}>{label}</NavLink>)}
-      </AdminDropdown>
+      </AdminDropdown>}
       <AdminDropdown label="LMS Config">
+        {canAccessAdmin(user) && <><NavLink to="/admin/learning-tools">Learning Tools</NavLink>
         <NavLink to="/admin/lms-types">LMS Types</NavLink>
-        <NavLink to="/admin/lms-instances">LMS Instances</NavLink>
+        <NavLink to="/admin/lms-instances">LMS Instances</NavLink></>}
         {adminFeatures.lmsAccesses && <NavLink to="/admin/lms-accesses">LMS Accesses</NavLink>}
       </AdminDropdown>
-      <AdminDropdown label="OpenDSA Books">
+      {canAccessAdmin(user) && <><AdminDropdown label="OpenDSA Books">
         <NavLink to="/admin/books">Book Instances</NavLink>
       </AdminDropdown>
       <NavLink to="/admin/users">Users</NavLink>
-      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}
+      {adminFeatures.errors && <NavLink to="/admin/errors">Errors</NavLink>}</>}
       <Link to="/profile" className="admin-user">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email}</Link>
       <button type="button" onClick={signOut}>Sign out</button>
     </nav>
@@ -156,7 +160,7 @@ function OrganizationShow() {
   return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="name" /><TextField source="abbreviation" />
     <TextField source="slug" /><DateField source="created_at" />
-  </SimpleShowLayout></Show>;
+  </SimpleShowLayout><OrganizationRelated /></Show>;
 }
 function TermsList() {
   return <AdminList searchPlaceholder="Term (e.g. fall-2026)" sort={{ field: "starts_on", order: "DESC" }}>
@@ -171,7 +175,7 @@ function TermShow() {
   return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="slug" label="Term" /><SelectField source="season" choices={seasons} />
     <TextField source="year" /><DateField source="starts_on" /><DateField source="ends_on" />
-  </SimpleShowLayout></Show>;
+  </SimpleShowLayout><TermRelated /></Show>;
 }
 function CoursesList() {
   return <AdminList searchPlaceholder="Course name or number" sort={{ field: "name", order: "ASC" }}>
@@ -185,8 +189,8 @@ function CoursesList() {
 function CourseShow() {
   return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="number" /><TextField source="name" />
-    <TextField source="organization.name" label="Organization" /><TextField source="organization_id" />
-    <TextField source="user_id" label="Owner user ID" /><TextField source="slug" />
+    <ReferenceField source="organization_id" reference="organizations" label="Organization" link="show" emptyText="—"><TextField source="name" /></ReferenceField>
+    <ReferenceField source="user_id" reference="users" label="Owner" link="show" emptyText="—"><TextField source="email" /></ReferenceField><TextField source="slug" />
     <DateField source="created_at" /><DateField source="updated_at" />
   </SimpleShowLayout></Show>;
 }
@@ -205,15 +209,15 @@ function OfferingsList() {
 function OfferingShow() {
   return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="label" />
-    <TextField source="course.name" label="Course" /><TextField source="course_id" />
-    <TextField source="term.slug" label="Term" /><TextField source="term_id" />
-    <TextField source="lms_instance_id" label="LMS instance ID" />
+    <ReferenceField source="course_id" reference="courses" label="Course" link="show" emptyText="—"><TextField source="name" /></ReferenceField>
+    <ReferenceField source="term_id" reference="terms" label="Term" link="show" emptyText="—"><TextField source="slug" /></ReferenceField>
+    <ReferenceField source="lms_instance_id" reference="lms-instances" label="LMS Instance" link="show" emptyText="—"><TextField source="url" /></ReferenceField>
     <TextField source="lms_course_num" label="LMS course number" />
     <TextField source="lms_course_code" label="LMS course code" /><TextField source="url" />
     <BooleanField source="archived" /><BooleanField source="self_enrollment_allowed" />
     <DateField source="cutoff_date" /><TextField source="late_policy_id" />
     <DateField source="created_at" /><DateField source="updated_at" />
-  </SimpleShowLayout></Show>;
+  </SimpleShowLayout><OfferingRelated /></Show>;
 }
 function BooksList() {
   return( 
@@ -234,8 +238,8 @@ function BookShow() {
   return <Show actions={false}><SimpleShowLayout>
     <TextField source="id" /><TextField source="title" /><TextField source="desc" label="Description" />
     <BooleanField source="template" /><TextField source="book_type" />
-    <TextField source="user.email" label="Owner" /><TextField source="user_id" label="Owner user ID" />
-    <TextField source="course_offering.label" label="Offering" /><TextField source="course_offering_id" />
+    <ReferenceField source="user_id" reference="users" label="Owner" link="show" emptyText="—"><TextField source="email" /></ReferenceField>
+    <ReferenceField source="course_offering_id" reference="course-offerings" label="Offering" link="show" emptyText="—"><TextField source="label" /></ReferenceField>
     <DateField source="last_compiled" showTime emptyText="Not compiled" />
     <DateField source="created_at" /><DateField source="updated_at" />
   </SimpleShowLayout></Show>;
@@ -253,8 +257,7 @@ function UsersList() {
 function UserShow() {
   return <Show><SimpleShowLayout>
     <TextField source="id" /><TextField source="email" /><TextField source="first_name" />
-    <TextField source="last_name" /><TextField source="global_role.name" label="Role" />
-    <TextField source="global_role_id" /><TextField source="time_zone_id" />
+    <TextField source="last_name" /><ReferenceField source="global_role_id" reference="roles" label="Role" link="show" emptyText="—"><TextField source="name" /></ReferenceField><TextField source="time_zone_id" />
     <DateField source="created_at" showTime /><DateField source="updated_at" showTime />
     <NumberField source="sign_in_count" />
     <DateField source="current_sign_in_at" label="Latest sign-in" showTime />
@@ -332,31 +335,37 @@ function LmsInstancesList() {
 }
 function LmsInstanceShow() {
   return <Show><SimpleShowLayout><TextField source="id" /><TextField source="url" />
-    <TextField source="lms_type_id" /><TextField source="organization_id" />
+    <ReferenceField source="lms_type_id" reference="lms-types" label="LMS Type" link="show" emptyText="—"><TextField source="name" /></ReferenceField>
+    <ReferenceField source="organization_id" reference="organizations" label="Organization" link="show" emptyText="—"><TextField source="name" /></ReferenceField>
     <TextField source="consumer_key" /><TextField source="client_id" /><TextField source="issuer" />
     <TextField source="keyset_url" /><TextField source="oauth2_url" /><TextField source="platform_oidc_auth_url" />
     <TextField source="public_key" /><DateField source="created_at" /><DateField source="updated_at" />
   </SimpleShowLayout></Show>;
 }
 export default function AdminDashboard() {
-  // The surrounding RequireAuth and every /api/admin endpoint enforce administrator access.
-  return <Admin basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={AdminHome}
+  const { user } = useAuth();
+  const administrator = canAccessAdmin(user);
+  // Credential owners have a narrow route; other resources remain administrator-only.
+  return <Admin key={`${user?.id}:${administrator}`} basename="/admin" dataProvider={dataProvider} layout={AdminLayout} dashboard={administrator ? AdminHome : undefined}
     disableTelemetry theme={{ palette: { mode: "light", primary: { main: "#175c91" },
       background: { default: "#f4f6f8", paper: "#ffffff" }, text: { primary: "#202b36", secondary: "#4b5968" } },
       typography: { fontFamily: "Arial, Helvetica, sans-serif" } }} darkTheme={null} title="OpenDSA Administration">
+    {administrator && <>
     <Resource name="organizations" list={OrganizationsList} show={OrganizationShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="terms" list={TermsList} show={TermShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="courses" list={CoursesList} show={CourseShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="course-offerings" options={{ label: "Course Offerings" }} list={OfferingsList} show={OfferingShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="course-roles" options={{ label: "Course Roles" }} list={CourseRolesList} show={CourseRoleShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="late-policies" options={{ label: "Late Policies" }} list={LatePoliciesList} show={LatePolicyShow} create={AdminCreate} edit={AdminEdit} />
+    <Resource name="learning-tools" options={{ label: "Learning Tools" }} list={LearningToolsList} show={LearningToolShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-types" options={{ label: "LMS Types" }} list={LmsTypesList} show={LmsTypeShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="lms-instances" options={{ label: "LMS Instances" }} list={LmsInstancesList} show={LmsInstanceShow} create={AdminCreate} edit={AdminEdit} />
     <Resource name="books" options={{ label: "Book Instances" }} list={BooksList} show={BookShow} />
     <Resource name="users" list={UsersList} show={UserShow} edit={UserEdit} />
     <Resource name="roles" options={{ label: "Global Roles" }} list={RolesList} show={RoleShow} />
+    </>}
     {adminFeatures.lmsAccesses && <Resource name="lms-accesses" options={{ label: "LMS Accesses" }}
       list={LmsAccessesList} show={LmsAccessShow} create={LmsAccessCreate} edit={LmsAccessEdit} />}
-    {adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
+    {administrator && adminFeatures.errors && <Resource name="errors" list={ErrorsList} show={ErrorShow} />}
   </Admin>;
 }

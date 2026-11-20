@@ -1,29 +1,17 @@
 import {
   Show, Edit, Create, SimpleShowLayout, SimpleForm, Datagrid, TextField, DateField, FunctionField, WrapperField,
-  ReferenceInput, SelectInput, AutocompleteInput, TextInput, PasswordInput, Toolbar, SaveButton, Button,
+  ReferenceInput, AutocompleteInput, TextInput, PasswordInput, Toolbar, SaveButton, Button,
   TopToolbar, ListButton, ShowButton, EditButton, DeleteWithConfirmButton,
   required, maxLength, useNotify, useRedirect, useRecordContext, type RaRecord,
 } from "react-admin";
+import { canAccessAdmin, useAuth } from "../auth/Auth";
 import { Link } from "react-router-dom";
 import { AdminList } from "./AdminListTools";
 import { adminFeatures } from "./adminFeatures";
 
-// Expected record shape: the API never returns
-// plaintext access tokens or consumer secrets, only a short hint and a presence flag;
-// the data provider also strips `access_token`/`consumer_secret` if a response contains them.
 type Person = { id: number; first_name: string | null; last_name: string | null; email: string };
 const personName = (user: Person) => [user.first_name, user.last_name].filter(Boolean).join(" ");
 const personLabel = (user: Person) => personName(user) ? `${personName(user)} - ${user.email}` : user.email;
-
-// Shows at most the last four characters a hint contains, so an over-long hint is never shown in full.
-function MaskedCredential({ hint, present }: { hint: string; present: string; label?: string }) {
-  const record = useRecordContext();
-  if (!record) return null;
-  if (!(hint in record) && !(present in record)) return <span className="admin-muted">Not available</span>;
-  const tail = typeof record[hint] === "string" ? record[hint].replace(/[^A-Za-z0-9_-]/g, "").slice(-4) : "";
-  if (!tail && record[present] !== true) return <span className="admin-muted">Not set</span>;
-  return <span className="admin-masked" aria-label={tail ? `Hidden; ends in ${tail}` : "Hidden"}>••••••••{tail}</span>;
-}
 
 function LmsAccessDeleteButton({ redirect }: { redirect: "list" | false }) {
   const record = useRecordContext();
@@ -35,21 +23,28 @@ function LmsAccessDeleteButton({ redirect }: { redirect: "list" | false }) {
     confirmContent={<>
       <p>This deletes the LMS access for <strong>{user}</strong> on <strong>{instance}</strong>.</p>
       <p>Its stored access token and consumer credentials are removed. Course generation and LTI launches that
-        rely on them will stop working for this user until new credentials are added. This cannot be undone.</p>
+        rely on them will stop working for this user until new credentials are added. Access linked to stored student progress cannot be deleted; update its credentials instead. This cannot be undone.</p>
     </>} />;
 }
 
-const instanceLink = (record: RaRecord) => record.lms_instance
-  ? <Link to={`/admin/lms-instances/${record.lms_instance_id}/show`}>{record.lms_instance.url}</Link>
-  : `LMS instance #${record.lms_instance_id}`;
-const userLink = (record: RaRecord) => record.user
-  ? <Link to={`/admin/users/${record.user_id}/show`}>{personLabel(record.user)}</Link>
-  : `User #${record.user_id}`;
+function InstanceValue({ record }: { record: RaRecord }) {
+  const { user } = useAuth();
+  const label = record.lms_instance?.url ?? `LMS instance #${record.lms_instance_id}`;
+  return canAccessAdmin(user) ? <Link to={`/admin/lms-instances/${record.lms_instance_id}/show`}>{label}</Link> : <>{label}</>;
+}
+function UserValue({ record }: { record: RaRecord }) {
+  const { user } = useAuth();
+  const label = record.user ? personLabel(record.user) : `User #${record.user_id}`;
+  return canAccessAdmin(user) ? <Link to={`/admin/users/${record.user_id}/show`}>{label}</Link> : <Link to="/profile">{label}</Link>;
+}
+const instanceLink = (record: RaRecord) => <InstanceValue record={record} />;
+const userLink = (record: RaRecord) => <UserValue record={record} />;
 
 export function LmsAccessesList() {
-  return <AdminList sort={{ field: "id", order: "ASC" }} filters={[
-    { source: "email", label: "Email", placeholder: "User email" },
-    { source: "lms_instance_id", label: "LMS instance", type: "select", reference: "lms-instances",
+  const { user } = useAuth();
+  return <AdminList className="admin-lms-accesses" sort={{ field: "id", order: "ASC" }} filters={[
+    ...(canAccessAdmin(user) ? [{ source: "email", label: "Email", placeholder: "User email" }] : []),
+    { source: "lms_instance_id", label: "LMS instance", type: "select", reference: "lms-access-instances",
       referenceSort: "url", optionText: record => String(record.url) },
     { source: "q", label: "Search", placeholder: "Name, email, or instance URL" },
   ]}>
@@ -59,7 +54,7 @@ export function LmsAccessesList() {
       <TextField source="user.first_name" label="First Name" sortable={false} emptyText="—" />
       <TextField source="user.last_name" label="Last Name" sortable={false} emptyText="—" />
       <TextField source="user.email" label="Email" sortable={false} />
-      <MaskedCredential label="Access Token" hint="access_token_hint" present="has_access_token" />
+      <TextField source="access_token" label="Access Token" sortable={false} emptyText="Not set" />
       <TextField source="consumer_key" label="Consumer Key" sortable={false} emptyText="—" />
       <WrapperField label="Actions">
         <span className="admin-row-actions"><ShowButton /><EditButton /><LmsAccessDeleteButton redirect={false} /></span>
@@ -75,13 +70,13 @@ export function LmsAccessShow() {
     <LmsAccessDeleteButton redirect="list" />
   </TopToolbar>}>
     <SimpleShowLayout>
-      <MaskedCredential label="Access Token" hint="access_token_hint" present="has_access_token" />
+      <TextField source="access_token" label="Access Token" sortable={false} emptyText="Not set" />
       <DateField source="created_at" label="Created At" showTime />
       <DateField source="updated_at" label="Updated At" showTime />
       <FunctionField label="LMS Instance" render={instanceLink} />
       <FunctionField label="User" render={userLink} />
       <TextField source="consumer_key" label="Consumer Key" emptyText="Not set" />
-      <MaskedCredential label="Consumer Secret" hint="consumer_secret_hint" present="has_consumer_secret" />
+      <TextField source="consumer_secret" label="Consumer Secret" emptyText="Not set" />
     </SimpleShowLayout>
   </Show>;
 }
@@ -89,17 +84,19 @@ export function LmsAccessShow() {
 const noWhitespace = (value: unknown) => typeof value === "string" && /\s/.test(value) ? "Must not contain spaces." : undefined;
 function LmsAccessForm({ editing }: { editing: boolean }) {
   const record = useRecordContext();
+  const { user } = useAuth();
+  const administrator = canAccessAdmin(user);
   const keep = editing ? "Leave blank to keep the current value." : undefined;
-  return <SimpleForm toolbar={<Toolbar>
+  return <SimpleForm defaultValues={{ user_id: user?.id }} toolbar={<Toolbar>
     <SaveButton label={editing ? "Update LMS Access" : "Create LMS Access"} />
     <Button label="Cancel" to={editing && record ? `/admin/lms-accesses/${record.id}/show` : "/admin/lms-accesses"} />
   </Toolbar>}>
-    <ReferenceInput source="lms_instance_id" reference="lms-instances" sort={{ field: "url", order: "ASC" }} perPage={100}>
-      <SelectInput label="LMS instance" optionText="url" validate={required()} />
+    <ReferenceInput source="lms_instance_id" reference="lms-access-instances" sort={{ field: "url", order: "ASC" }} perPage={100}>
+      <AutocompleteInput label="LMS instance" optionText="url" validate={required()} />
     </ReferenceInput>
-    <ReferenceInput source="user_id" reference="users" sort={{ field: "email", order: "ASC" }}>
+    {administrator ? <ReferenceInput source="user_id" reference="users" sort={{ field: "email", order: "ASC" }}>
       <AutocompleteInput label="User" optionText={personLabel} validate={required()} />
-    </ReferenceInput>
+    </ReferenceInput> : <p>Credentials for {user?.email}</p>}
     <PasswordInput source="access_token" label="Access token" autoComplete="off"
       helperText={keep ?? "The Canvas API token for this user."} validate={[maxLength(255), noWhitespace]} />
     <TextInput source="consumer_key" label="Consumer key" autoComplete="off" validate={[maxLength(255), noWhitespace]} />

@@ -54,7 +54,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/license" element={<License />} />
           <Route path="/textbooks/new" element={<RequireAuth instructor><CreateTextbook /></RequireAuth>} />
-          <Route path="/admin/*" element={<RequireAuth administrator><Suspense fallback={<p>Loading administration…</p>}><AdminDashboard /></Suspense></RequireAuth>} />
+          <Route path="/admin/*" element={<RequireAuth administrator allowOwnLmsAccess><Suspense fallback={<p>Loading administration…</p>}><AdminDashboard /></Suspense></RequireAuth>} />
 
           <Route
             path="/documentation"

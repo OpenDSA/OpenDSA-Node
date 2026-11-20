@@ -1,7 +1,7 @@
 import { Router, type Request } from "express";
 import { requireAuthentication, requireAdministrator, requireCsrf } from "../auth";
 import { Prisma } from "@prisma/client";
-import { INSTRUCTOR_COURSE_ROLE_ID } from "../services/course-roles";
+import { INSTRUCTOR_COURSE_ROLE_ID, STUDENT_COURSE_ROLE_ID } from "../services/course-roles";
 import { lmsInstanceAdminSelect } from "../services/lms-instance-config";
 import { editableAdminResources, saveAdminRecord, adminRecordError } from "../services/admin-records";
 import { prisma } from "../db";
@@ -174,12 +174,13 @@ adminRouter.get("/roles", async (req, res) => {
 const courseRoleSelect = { id: true, name: true, builtin: true, can_manage_course: true,
   can_manage_assignments: true, can_grade_submissions: true, can_view_other_submissions: true } as const;
 const latePolicySelect = { id: true, name: true, late_days: true, late_percent: true, created_at: true, updated_at: true } as const;
+const learningToolSelect = { id: true, name: true, key: true, secret: true, launch_url: true, created_at: true, updated_at: true } as const;
 const lmsTypeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
 // Admin metadata includes the public key; private keys/shared secrets are never returned.
 const lmsInstanceSelect = lmsInstanceAdminSelect;
-for (const resource of ["course-roles", "late-policies", "lms-types", "lms-instances"] as const) {
+for (const resource of ["course-roles", "late-policies", "lms-types", "lms-instances", "learning-tools"] as const) {
   adminRouter.get(`/${resource}`, async (req, res) => {
-    const options = listOptions(req, resource === "lms-instances" ? ["id", "url"] : ["id", "name"], "id");
+    const options = listOptions(req, resource === "learning-tools" ? ["id", "name", "key", "launch_url", "created_at", "updated_at"] : resource === "lms-instances" ? ["id", "url"] : ["id", "name"], "id");
     if (!options) { res.status(400).json({ error: "Invalid list parameters." }); return; }
     const { q, ...paging } = options;
     if (resource === "course-roles") {
@@ -189,6 +190,10 @@ for (const resource of ["course-roles", "late-policies", "lms-types", "lms-insta
     } else if (resource === "late-policies") {
       const where = q ? { name: { contains: q } } : {};
       const [data, total] = await Promise.all([prisma.latePolicies.findMany({ where, ...paging, select: latePolicySelect }), prisma.latePolicies.count({ where })]);
+      res.json({ data, total });
+    } else if (resource === "learning-tools") {
+      const where = q ? { OR: [{ name: { contains: q } }, { key: { contains: q } }, { launch_url: { contains: q } }] } : {};
+      const [data, total] = await Promise.all([prisma.learningTools.findMany({ where, ...paging, select: learningToolSelect }), prisma.learningTools.count({ where })]);
       res.json({ data, total });
     } else if (resource === "lms-types") {
       const where = q ? { name: { contains: q } } : {};
@@ -201,6 +206,20 @@ for (const resource of ["course-roles", "late-policies", "lms-types", "lms-insta
     }
   });
 }
+adminRouter.delete("/learning-tools/:id", requireCsrf, async (req, res, next) => {
+  if (!/^[1-9]\d*$/.test(String(req.params.id)) || Number(req.params.id) > 2147483647) {
+    res.status(400).json({ error: "Invalid record ID." }); return;
+  }
+  try {
+    const data = await prisma.learningTools.delete({ where: { id: Number(req.params.id) }, select: { id: true } });
+    res.json({ data });
+  } catch (error) {
+    const result = adminRecordError(error);
+    if (result) { res.status(result.status).json({ error: result.error }); return; }
+    next(error);
+  }
+});
+
 for (const resource of editableAdminResources) {
   for (const method of ["post", "patch"] as const) {
     adminRouter[method](method === "post" ? `/${resource}` : `/${resource}/:id`, requireCsrf, async (req, res, next) => {
@@ -272,7 +291,7 @@ adminRouter.patch("/users/:id", requireCsrf, async (req, res, next) => {
   }
 });
 
-for (const resource of ["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances"] as const) {
+for (const resource of ["organizations", "terms", "courses", "course-offerings", "books", "users", "roles", "course-roles", "late-policies", "lms-types", "lms-instances", "learning-tools"] as const) {
   adminRouter.get(`/${resource}/:id`, async (req, res) => {
     const rawId = String(req.params.id);
     if (!/^[1-9]\d*$/.test(rawId) || Number(rawId) > 2147483647) {
@@ -280,15 +299,20 @@ for (const resource of ["organizations", "terms", "courses", "course-offerings",
     }
     const where = { id: Number(rawId) };
     const data = resource === "organizations"
-      ? await prisma.organizations.findUnique({ where, select: organizationSelect })
-      : resource === "terms" ? await prisma.terms.findUnique({ where, select: termSelect })
+      ? await prisma.organizations.findUnique({ where, select: { ...organizationSelect, courses: { orderBy: { id: "asc" }, select: { id: true, number: true, name: true } } } })
+      : resource === "terms" ? await prisma.terms.findUnique({ where, select: { ...termSelect, course_offerings: { orderBy: { id: "asc" }, select: { id: true, label: true, course: { select: { id: true, number: true, organization: { select: { abbreviation: true } } } } } } } })
       : resource === "courses" ? await prisma.courses.findUnique({ where, select: courseSelect })
-      : resource === "course-offerings" ? await prisma.courseOfferings.findUnique({ where, select: offeringSelect })
+      : resource === "course-offerings" ? await prisma.courseOfferings.findUnique({ where, select: { ...offeringSelect,
+        inst_books: { orderBy: { id: "asc" }, select: { id: true, title: true, desc: true } },
+        course_enrollments: { where: { course_role_id: { in: [INSTRUCTOR_COURSE_ROLE_ID, STUDENT_COURSE_ROLE_ID] } }, orderBy: { id: "asc" },
+          select: { course_role_id: true, user: { select: { id: true, first_name: true, last_name: true, email: true } } } },
+      } })
       : resource === "books" ? await prisma.instBooks.findUnique({ where, select: bookSelect })
       : resource === "users" ? await prisma.users.findUnique({ where, select: userSelect })
       : resource === "roles" ? await prisma.globalRoles.findUnique({ where, select: roleSelect })
       : resource === "course-roles" ? await prisma.courseRoles.findUnique({ where, select: courseRoleSelect })
       : resource === "late-policies" ? await prisma.latePolicies.findUnique({ where, select: latePolicySelect })
+      : resource === "learning-tools" ? await prisma.learningTools.findUnique({ where, select: learningToolSelect })
       : resource === "lms-types" ? await prisma.lmsTypes.findUnique({ where, select: lmsTypeSelect })
       : await prisma.lmsInstances.findUnique({ where, select: lmsInstanceSelect });
     if (!data) { res.status(404).json({ error: "Record not found." }); return; }
@@ -296,7 +320,7 @@ for (const resource of ["organizations", "terms", "courses", "course-offerings",
   });
   adminRouter.all([`/${resource}`, `/${resource}/:id`], (_req, res) => {
     const editable = (editableAdminResources as readonly string[]).includes(resource);
-    res.set("Allow", _req.params.id ? (editable || resource === "users" ? "GET, HEAD, PATCH" : "GET, HEAD") :
+    res.set("Allow", _req.params.id ? (resource === "learning-tools" ? "GET, HEAD, PATCH, DELETE" : editable || resource === "users" ? "GET, HEAD, PATCH" : "GET, HEAD") :
       (editable ? "GET, HEAD, POST" : "GET, HEAD")).status(405).json({ error: "This operation is not supported." });
   });
 }

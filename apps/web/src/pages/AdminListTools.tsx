@@ -1,9 +1,11 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { List, useGetList, useListContext, type ListProps, type RaRecord } from "react-admin";
 import { Link, useLocation } from "react-router-dom";
+import { canAccessAdmin, useAuth } from "../auth/Auth";
 
 // [plural, singular] labels used by the page header and breadcrumbs.
 export const adminResourceLabels: Record<string, [string, string]> = {
+  "learning-tools": ["Learning Tools", "Learning Tool"],
   organizations: ["Organizations", "Organization"], terms: ["Terms", "Term"],
   courses: ["Courses", "Course"], "course-offerings": ["Course Offerings", "Course Offering"],
   "course-roles": ["Course Roles", "Course Role"], roles: ["Global Roles", "Global Role"],
@@ -31,7 +33,10 @@ function headerFor(pathname: string): { title: string; crumbs: Crumb[] } | null 
 
 export function AdminPageHeader() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const header = headerFor(pathname);
+  if (header && !canAccessAdmin(user)) header.crumbs = header.crumbs.map(crumb =>
+    crumb.to === "/admin" ? { label: "OpenDSA", to: "/" } : crumb);
   if (!header) return null;
   return <header className="admin-page-header">
     <nav aria-label="Breadcrumb" className="admin-page-breadcrumb">
