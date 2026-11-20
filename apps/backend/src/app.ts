@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import { authSession, initializePassport, restoreUser } from "./auth";
 import { apiRouter } from "./routes";
+import { odsaRouter } from "./routes/odsa";
 import { lti13Router } from "./lti/provider";
 import { trustProxyHops } from "./auth/sessions";
 
@@ -23,6 +24,9 @@ app.use("/api", apiRouter);
 // LTI 1.3 (ltijs): /api/lti13/login_initiations, /api/lti13/launches,
 // /api/lti13/keys, plus the /api/lti13/session debug route.
 app.use(lti13Router);
+
+// OpenDSA's client posts to root /odsa_* paths, matching the Rails app.
+app.use(odsaRouter);
 
 
 // Basic universal error handler middleware

@@ -60,6 +60,24 @@ export async function validateLtiLaunch(
 
   const provider = new Provider(consumerKey, secret);
 
+  // Canvas signs the public HTTPS URL, but this backend is behind Vite and
+  // cloudflared locally (and nginx in k8s). `ims-lti` builds its signature
+  // base string from req.protocol + req.headers.host, which can otherwise
+  // become http://<backend> and reject every valid launch. Prefer the
+  // forwarded values, then the configured public book origin.
+  const publicUrl = process.env.PUBLIC_ORIGIN ||
+    process.env.BOOKS_PUBLIC_URL ||
+    "";
+  let publicOrigin: URL | null = null;
+  try { publicOrigin = publicUrl ? new URL(publicUrl) : null; } catch { /* ignore */ }
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const validationReq = Object.create(req) as Request;
+  const protocol = forwardedProto || publicOrigin?.protocol.replace(":", "") || req.protocol;
+  const host = forwardedHost || publicOrigin?.host || req.get("host");
+  Object.defineProperty(validationReq, "protocol", { value: protocol });
+  validationReq.headers = { ...req.headers, host: host ?? req.headers.host };
+
   // old rails code had a separate canvas specific signature check here.
   // looked at ims-lti's source (lib/hmac-sha1.js) and it already checks
   // tool_consumer_info_product_family_code === 'canvas' internally and handles
@@ -69,13 +87,21 @@ export async function validateLtiLaunch(
   // specific branch directly yet
 
   const isValid = await new Promise<boolean>((resolve, reject) => {
-    provider.valid_request(req, params, (err: Error | null, valid: boolean) => {
+    provider.valid_request(validationReq, params, (err: Error | null, valid: boolean) => {
       if (err) return reject(err);
       resolve(valid);
     });
   }).catch(() => false);
 
   if (!isValid) {
+    console.warn("[lti11] OAuth signature validation failed", {
+      consumerKey,
+      protocol: req.protocol,
+      forwardedProto: req.get("x-forwarded-proto"),
+      host: req.get("host"),
+      originalUrl: req.originalUrl,
+      canvas: params["tool_consumer_info_product_family_code"] === "canvas",
+    });
     return { valid: false, message: "oauth signature was invalid" };
   }
 

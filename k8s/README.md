@@ -193,10 +193,12 @@ kubectl get ns 91762f26-opendsanode
     # browse localhost:8080, confirm the SPA loads
     ```
 11. ```
-    kubectl apply -f k8s/60-ingress.yaml
+    kubectl apply -f k8s/60-ingress.yaml -f k8s/61-opendsa-legacy-prefix-ingress.yaml
     kubectl get ingress -n 91762f26-opendsanode
     # browse https://91762f26-opendsanode.discovery.cs.vt.edu/ and /api/health
     # (needs on-campus network or VPN - see ingress note below)
+    # /OpenDSA is rewritten to the opendsa service by 61-...; /odsa_ is
+    # routed to the backend for exercise attempts and progress.
     ```
 12. Restart-safety checks:
     ```

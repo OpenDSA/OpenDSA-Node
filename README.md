@@ -28,11 +28,12 @@ deployment:
   `/healthz`, `/api/configure/`, `/api/simple2full/`, and the static-serving
   rules match production.
 - The Vite dev server on `:5173` is the local equivalent of the k8s ingress.
-  It proxies `/api` to the backend and `/Books`, `/lib`, `/AV`,
-  `/DataStructures`, `/Exercises`, `/khan-exercises`, and
+  It proxies `/api` and `/odsa_` to the backend and `/Books`, `/OpenDSA`,
+  `/lib`, `/AV`, `/DataStructures`, `/Exercises`, `/khan-exercises`, and
   `/Metadata/inlineav` to opendsa. Use `http://localhost:5173` as the public
   origin for local LTI launch/keyset URLs and for `BOOKS_PUBLIC_URL`; this
-  keeps the LTI redirect to `/Books/...` and all book assets on one origin.
+  keeps the LTI redirect to `/Books/...`, the legacy `/OpenDSA` book assets,
+  and exercise attempt requests on one origin.
 - Compiled books are written to
   `../OpenDSA-DevStack/opendsa/Books/<org>/<course>/<term>/<label>/` on the
   host. They can be viewed through the Vite origin
@@ -41,6 +42,20 @@ deployment:
 - Unlike k8s, `CONFIG_API_LINK` points at `http://opendsa:8080/...` instead of
   `localhost`, because the compiler is a separate container here rather than a
   sidecar in the backend Pod.
+
+For a clean local LTI test, reset and seed the database for one protocol:
+
+```bash
+# LTI 1.3: pass the Canvas developer-key client id
+npm run db:reset:lti -w apps/backend -- \
+  --protocol 1.3 --client-id <canvas-client-id>
+
+# LTI 1.1: uses the consumer key/secret from apps/backend/.env
+npm run db:reset:lti -w apps/backend -- --protocol 1.1
+```
+
+The script stops backend/web, resets and seeds the database, registers the 1.3
+platform when needed, and prints the tunnel/Canvas URLs to update next.
 
 To exercise the handoff without the course-generation route (which also needs
 Canvas credentials and seeded data), drop a minimal config into the shared dir

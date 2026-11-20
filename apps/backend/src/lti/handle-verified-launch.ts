@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { sessionLifetimeSeconds } from "../auth/sessions";
 import { buildBookOutputPath } from "../course_creation/utils";
 import { ensureLmsInstance, ensureUser, ltiEnroll } from "./post-launch";
+import { getOrCreateModuleProgress } from "./module-progress";
 import { LaunchRenderError, renderModuleLaunch } from "./render-launch";
 import type { LtiLaunchContext } from "./types";
 
@@ -72,6 +73,10 @@ export async function handleVerifiedLaunch(
       "userId",
       "csrfToken",
       "expiresAt",
+      "ltik",
+      "courseOfferingId",
+      "instBookId",
+      "lmsInstanceId",
       "lisOutcomeServiceUrl",
       "lisResultSourcedid",
     ] as const) {
@@ -79,8 +84,12 @@ export async function handleVerifiedLaunch(
     }
     req.authSession.userId = user.id;
     req.authSession.expiresAt = Date.now() + sessionLifetimeSeconds * 1000;
-    // Grade passback is not built yet, but keep the launch pointers so the
-    // future implementation doesn't need another launch.
+    req.authSession.ltik = context.ltik ?? undefined;
+    req.authSession.courseOfferingId = instBook.course_offering.id;
+    req.authSession.instBookId = instBook.id;
+    req.authSession.lmsInstanceId = lmsInstance.id;
+    // Grade passback uses these pointers; they are also useful as a fallback
+    // when an exercise iframe cannot send the parent page's ltik header.
     if (context.lisOutcomeServiceUrl) {
       req.authSession.lisOutcomeServiceUrl = context.lisOutcomeServiceUrl;
     }
@@ -92,6 +101,36 @@ export async function handleVerifiedLaunch(
 
   await ltiEnroll(user.id, instBook.course_offering.id, context.isInstructor);
 
+  const offering = instBook.course_offering;
+
+  // Keep the validated 1.3 launch token so follow-up exercise requests can
+  // resume the ltijs context for AGS grade passback without relying on a
+  // third-party iframe cookie.
+  if (context.ltik) {
+    const now = new Date();
+    try {
+      await prisma.ltiLaunches.create({
+        data: {
+          lms_instance_id: lmsInstance.id,
+          user_id: user.id,
+          course_offering_id: offering.id,
+          id_token: context.ltik,
+          decoded_jwt: JSON.stringify({
+            protocol: context.protocol ?? "1.3",
+            sub: context.rawUserId,
+            email: context.email,
+            params: context.rawLaunchParams ?? {},
+          }),
+          expires_at: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          created_at: now,
+          updated_at: now,
+        },
+      });
+    } catch (error) {
+      console.error("[lti] unable to persist launch token", error);
+    }
+  }
+
   // Instructor tool placement: send them to the course dashboard.
   if (context.customCourseOfferingId) {
     return {
@@ -100,7 +139,6 @@ export async function handleVerifiedLaunch(
     };
   }
 
-  const offering = instBook.course_offering;
   const buildPath = buildBookOutputPath({
     organizationSlug: offering.course.organization.slug,
     courseSlug: offering.course.slug,
@@ -128,6 +166,23 @@ export async function handleVerifiedLaunch(
         status: 404,
         message: "book module not found for this launch",
       };
+    }
+
+    try {
+      await getOrCreateModuleProgress({
+        userId: user.id,
+        instBookId: instBook.id,
+        instChapterModuleId: chapterModule.id,
+        lmsAccessId: null,
+        lisOutcomeServiceUrl: context.lisOutcomeServiceUrl,
+        lisResultSourcedid: context.lisResultSourcedid,
+      });
+      console.log(
+        `[lti] module ${chapterModule.id} progress ready; ` +
+        `AGS line item=${context.lisOutcomeServiceUrl ?? "none"}`
+      );
+    } catch (error) {
+      console.error("[lti] unable to initialize module progress", error);
     }
 
     try {

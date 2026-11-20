@@ -21,6 +21,9 @@ services:
       - NODE_ENV=development
       - PORT=3000
       - DATABASE_URL=mysql://root:secret@mysql:3306/lti_db
+      # Vite/cloudflared is one trusted proxy hop. This is required for
+      # LTI 1.1 OAuth signature validation to see the public HTTPS protocol.
+      - TRUST_PROXY_HOPS=1
       # Same shared-dir path as k8s. The API link differs: in k8s the
       # opendsa sidecar is in the same Pod (http://localhost:8080/...),
       # here it is a separate container, so use the compose service name.
@@ -30,7 +33,7 @@ services:
       # ingress: it proxies /api to the backend and the book/static paths
       # to opendsa. Use :5173 as the public origin for local LTI URLs and
       # generated book links.
-      - BOOKS_PUBLIC_URL=https://toolbar-dealers-disposition-excuse.trycloudflare.com/Books
+      - BOOKS_PUBLIC_URL=https://designation-routers-bloom-sealed.trycloudflare.com/Books
     depends_on:
       mysql:
         condition: service_healthy

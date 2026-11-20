@@ -16,6 +16,26 @@ declare module "ims-lti" {
     student: boolean;
     admin: boolean;
   }
+
+  export class OutcomeService {
+    constructor(options: {
+      consumer_key: string;
+      consumer_secret: string;
+      service_url: string;
+      source_did: string;
+      result_data_types?: string[];
+      signer?: unknown;
+      cert_authority?: string | null;
+      language?: string;
+    });
+    send_read_result(
+      callback: (err: Error | null, score?: number) => void
+    ): void;
+    send_replace_result(
+      score: number,
+      callback: (err: Error | null, success: boolean) => void
+    ): void;
+  }
 }
 
 declare module "ims-lti/lib/hmac-sha1" {

@@ -23,6 +23,14 @@ spec:
                 name: backend
                 port:
                   number: 3000
+          # OpenDSA exercise/attempt endpoints are root paths, not /api.
+          - path: /odsa_
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 3000
           # Routed straight to the opendsa sidecar, scoped to just the
           # paths it needs to serve - see "served content scoping" in
           # k8s/README.md for why these six specifically.

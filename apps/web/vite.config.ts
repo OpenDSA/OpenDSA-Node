@@ -26,6 +26,7 @@ export default defineConfig({
     allowedHosts: [".ngrok-free.dev", ".trycloudflare.com"],
     proxy: {
       '/api': backendTarget,
+      '/odsa_': backendTarget,
       '/OpenDSA': {
         target: opendsaTarget,
         rewrite: (path) => path.replace(/^\/OpenDSA(?=\/|$)/, '') || '/',

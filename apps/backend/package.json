@@ -8,6 +8,7 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:reset:lti": "bash scripts/reset_local_lti.sh",
     "lti:register": "tsx scripts/register_lti_platform.ts"
   },
   "dependencies": {

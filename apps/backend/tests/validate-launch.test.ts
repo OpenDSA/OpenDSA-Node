@@ -53,6 +53,18 @@ test("validateLtiLaunch accepts a properly signed request", async () => {
   assert.equal(result.valid, true);
 });
 
+test("validateLtiLaunch accepts a signature behind an https proxy", async () => {
+  const { req, body } = buildSignedBody();
+  // The backend socket is HTTP behind Vite/cloudflared even though Canvas
+  // signed the public HTTPS URL.
+  (req as unknown as { protocol: string }).protocol = "http";
+  req.headers["x-forwarded-proto"] = "https";
+  req.body = body;
+
+  const result = await validateLtiLaunch(req, async k => (k === key ? secret : null));
+  assert.equal(result.valid, true);
+});
+
 // custom_inst_book_id/custom_course_offering_id get used as prisma ids
 // downstream, so a value like "12.5" needs to come back null here instead of
 // a truthy non-integer that would blow up that query with a type error

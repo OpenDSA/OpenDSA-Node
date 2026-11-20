@@ -16,12 +16,31 @@ if (!/^\d+$/.test(proxyHops) || !Number.isSafeInteger(Number(proxyHops))) {
 }
 export const trustProxyHops = Number(proxyHops);
 
+// Local LTI testing through a tunnel is still NODE_ENV=development, but the
+// exercise iframe is a cross-site context. These overrides let a developer
+// opt into the production cookie shape without running the whole backend as
+// production. Use SESSION_COOKIE_SECURE=true and
+// SESSION_COOKIE_SAMESITE=none only when accessing the UI through the HTTPS
+// tunnel; an HTTP localhost login will not send a Secure cookie.
+const cookieSameSite =
+  (process.env.SESSION_COOKIE_SAMESITE as "lax" | "strict" | "none" | undefined) ||
+  (productionAuth ? "none" : "lax");
+const cookieSecure =
+  process.env.SESSION_COOKIE_SECURE === "true" || productionAuth;
+
 export interface SessionData {
   userId?: number;
   csrfToken?: string;
   expiresAt?: number;
-  // stashed here after an lti launch so grade passback (not built yet) has
-  // somewhere to read them back from later - see lti/post-launch.ts
+  // LTI launch state, kept so iframe AJAX requests can resolve the book,
+  // offering, and AGS context even when an exercise runs in a nested iframe
+  // that does not receive the parent page's ltik prefilter.
+  ltik?: string;
+  courseOfferingId?: number;
+  instBookId?: number;
+  lmsInstanceId?: number;
+  // stashed here after an lti launch so grade passback has somewhere to read
+  // them back from later - see lti/post-launch.ts
   lisOutcomeServiceUrl?: string;
   lisResultSourcedid?: string;
 }
@@ -38,7 +57,7 @@ export const cookieSession: RequestHandler = async (req, res, next) => {
       cookieName: sessionCookieName,
       password: sessionSecret,
       ttl: sessionLifetimeSeconds,
-      cookieOptions: { httpOnly: true, sameSite: productionAuth ? "none" : "lax", secure: productionAuth, path: "/" }, // none in prod so the cookie survives canvas's cross site iframe
+      cookieOptions: { httpOnly: true, sameSite: cookieSameSite, secure: cookieSecure, path: "/" }, // none in prod so the cookie survives canvas's cross site iframe
     });
     // Keep login expiry fixed even when saving a new CSRF cookie later.
     if (req.authSession.userId !== undefined &&
